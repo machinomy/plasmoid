@@ -1,0 +1,80 @@
+{
+  "name": "@machinomy/plasmoid",
+  "version": "0.0.1",
+  "description": "Machinomy realization of Plasma",
+  "license": "Apache-2.0",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "directories": {
+    "test": "test"
+  },
+  "config": {
+    "truffleTests": "test/**/*.test.js",
+    "wrappedArtifacts": "build/contracts/@(Plasmoid).json"
+  },
+  "scripts": {
+    "prepublish": "yarn lint && yarn build --outDir dist/ && cp -r build/ dist/build",
+    "lint": "yarn lint:solidity && yarn lint:typescript",
+    "lint:solidity": "solium -d contracts/",
+    "lint:typescript": "tslint --format stylish --project .",
+    "build": "yarn support:wrap && tsc --project tsconfig.json",
+    "support:wrap": "yarn truffle:compile && wraptso $npm_package_config_wrappedArtifacts --output ./build/wrappers",
+    "support:build": "tsc --project support/tsconfig.json",
+    "truffle:test": "run-with-testrpc 'truffle test $npm_package_config_truffleTests'",
+    "truffle:compile": "truffle compile",
+    "truffle:migrate": "truffle migrate",
+    "test": "yarn build && yarn truffle:test",
+    "coverage": "./node_modules/.bin/solidity-coverage"
+  },
+  "devDependencies": {
+    "@machinomy/types-ethereumjs-units": "^0.0.2",
+    "@machinomy/types-truffle": "^0.0.2",
+    "@machinomy/types-truffle-artifactor": "^0.0.1",
+    "@machinomy/types-truffle-compile": "^0.0.2",
+    "@machinomy/types-truffle-config": "^0.0.2",
+    "@machinomy/types-truffle-contract-sources": "^0.0.1",
+    "@machinomy/types-truffle-resolver": "^0.0.1",
+    "@machinomy/types-web3": "^0.0.7",
+    "@machinomy/wraptso": "^0.0.9",
+    "@types/bignumber.js": "4.0.2",
+    "@types/chai": "^4.0.5",
+    "@types/chai-as-promised": "^7.1.0",
+    "@types/mkdirp": "^0.5.2",
+    "@types/node": "^10.9.4",
+    "@types/yargs": "^10.0.1",
+    "chai": "^4.1.2",
+    "chai-as-promised": "^7.1.1",
+    "coveralls": "^3.0.0",
+    "ethereumjs-abi": "https://github.com/ethereumjs/ethereumjs-abi",
+    "ethereumjs-units": "^0.2.0",
+    "handlebars": "^4.0.11",
+    "mkdirp": "^0.5.1",
+    "run-with-testrpc": "^0.2.1",
+    "solidity-coverage": "^0.4.9",
+    "solium": "^1.0.11",
+    "truffle": "^4.1.0",
+    "truffle-flattener": "^1.2.3",
+    "tslint": "^5.7.0",
+    "tslint-config-standard": "^6.0.1",
+    "types-ethereumjs-util": "https://github.com/machinomy/types-ethereumjs-util",
+    "typescript": "^3.0.3",
+    "yargs": "^10.1.1",
+    "zeppelin-solidity": "^1.6.0"
+  },
+  "dependencies": {
+    "bignumber.js": "4.1.0",
+    "buffer": "^5.0.7",
+    "ethereumjs-util": "^5.1.5",
+    "keccak": "^1.4.0",
+    "truffle-contract": "^3.0.0",
+    "utf8": "^3.0.0",
+    "web3": "^0.20.1"
+  },
+  "resolutions": {
+    "upath": "^1.0.5",
+    "sha3": "^1.2.1"
+  }
+}
