@@ -1,8 +1,10 @@
 import Plasmoid from '../build/wrappers/Plasmoid'
+import MintableToken from '../build/wrappers/MintableToken'
 import * as ethUtil from 'ethereumjs-util'
 
 export {
-  Plasmoid
+  Plasmoid,
+  MintableToken
 }
 
 export function randomId (digits: number = 3) {

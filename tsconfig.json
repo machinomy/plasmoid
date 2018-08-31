@@ -6,7 +6,14 @@
     "sourceMap": true,          // Generate corresponding '.map' file
     "declaration": true,        // Generate corresponding '.d.ts' file
     "strict": true,             // Enable all strict type-checking options
-    "noImplicitReturns": true   // Report error when not all code paths in function return a value
+    "noImplicitReturns": true,   // Report error when not all code paths in function return a value
+    "types": [
+      "@machinomy/types-ethereumjs-util",
+      "@machinomy/types-web3",
+      "@machinomy/types-truffle-contract",
+      "@types/mocha",
+      "@types/node"
+    ]
   },
   "exclude": [
     "node_modules/abstract-leveldown/index.d.ts"
