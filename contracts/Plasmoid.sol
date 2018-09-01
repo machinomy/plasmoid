@@ -14,8 +14,9 @@ contract Plasmoid {
 
     StandardToken public token;
 
-    event DidDeposit(address indexed owner, uint256 indexed uid, uint256 amount);
-    event DidWithdraw(address indexed owner, uint256 indexed uid, uint256 amount);
+    event DidDeposit(uint256 indexed uid, address indexed owner, uint256 amount);
+    event DidWithdraw(uint256 indexed uid, address indexed owner, uint256 amount);
+    event DidTransfer(uint256 indexed uid, address indexed owner, address indexed receiver);
 
     constructor (address _tokenAddress) public {
         token = StandardToken(_tokenAddress);
@@ -26,14 +27,22 @@ contract Plasmoid {
         return balances[_uid];
     }
 
-    function deposit (uint256 amount) public {
-        require(amount > 0, "Can not deposit 0");
-        require(token.transferFrom(msg.sender, address(this), amount));
+    function deposit (uint256 _amount) public {
+        require(_amount > 0, "Can not deposit 0");
+        require(token.transferFrom(msg.sender, address(this), _amount));
         uid = uid.add(1);
-        balances[uid] = amount;
+        balances[uid] = _amount;
         owners[uid] = msg.sender;
 
-        emit DidDeposit(msg.sender, uid, amount);
+        emit DidDeposit(uid, msg.sender, _amount);
+    }
+
+    function transfer(uint256 _uid, address receiver) public {
+        address owner = owners[_uid];
+        require(owner == msg.sender, "Only owner can transfer");
+        owners[_uid] = receiver;
+
+        emit DidTransfer(_uid, owner, receiver);
     }
 
     function withdraw (uint256 _uid) public {
@@ -46,6 +55,6 @@ contract Plasmoid {
         delete balances[_uid];
         delete owners[_uid];
 
-        emit DidWithdraw(owner, uid, amount);
+        emit DidWithdraw(uid, owner, amount);
     }
 }
