@@ -2,7 +2,7 @@
   "name": "@machinomy/plasmoid",
   "version": "0.0.1",
   "description": "Machinomy realization of Plasma",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "files": [
