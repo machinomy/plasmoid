@@ -1,17 +1,17 @@
 pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/MintableToken.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 
 
 contract Plasmoid {
     using SafeMath for uint256;
 
     mapping (address => uint256) private balances;
-    MintableToken public token;
+    StandardToken public token;
 
     constructor (address _tokenAddress) public {
-        token = MintableToken(_tokenAddress);
+        token = StandardToken(_tokenAddress);
     }
 
     function balanceOf (address owner) public view returns (uint256) {
