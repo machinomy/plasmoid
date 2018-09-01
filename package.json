@@ -44,7 +44,7 @@
     "handlebars": "^4.0.11",
     "mkdirp": "^0.5.1",
     "run-with-testrpc": "^0.3.x",
-    "solidity-coverage": "^0.4.9",
+    "solidity-coverage": "^0.5.x",
     "solium": "^1.0.11",
     "truffle": "^4.1.0",
     "truffle-flattener": "^1.2.3",
