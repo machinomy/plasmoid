@@ -8,11 +8,13 @@
     "strict": true,             // Enable all strict type-checking options
     "noImplicitReturns": true,   // Report error when not all code paths in function return a value
     "types": [
-      "@machinomy/types-ethereumjs-util",
+      "@machinomy/types-ethereumjs-units",
       "@machinomy/types-web3",
+      "@machinomy/types-truffle",
       "@machinomy/types-truffle-contract",
-      "@types/mocha",
-      "@types/node"
+      "@machinomy/types-truffle-deployer",
+      "@types/node",
+      "@types/jest"
     ]
   },
   "exclude": [
@@ -20,7 +22,6 @@
   ],
   "include": [
     "build/wrappers/*.ts",
-    "node_modules/**/*/index.d.ts",
     "src/globals.d.ts",
     "src/**/*.ts",
     "migrations/**/*.ts",

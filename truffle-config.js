@@ -35,10 +35,15 @@ module.exports = {
       gas: GAS_LIMIT
     }
   },
-  solc: {
-    optimizer: {
-      enabled: true,
-      runs: 200
+  compilers: {
+    solc: {
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        },
+        evmVersion: "byzantium"
+      }
     }
   }
 }
