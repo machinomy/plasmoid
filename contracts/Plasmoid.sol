@@ -25,6 +25,7 @@ contract Plasmoid {
 
     function withdraw () public {
         require(balances[msg.sender] > 0, "Balance is 0");
-        token.transfer(msg.sender, balances[msg.sender]);
+        require(token.transfer(msg.sender, balances[msg.sender]));
+        balances[msg.sender] = 0;
     }
 }
