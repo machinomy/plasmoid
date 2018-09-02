@@ -117,13 +117,13 @@ contract('Plasmoid', accounts => {
     test('change ownership', async () => {
       const ownerBefore = await plasmoid.owners(uid)
       expect(ownerBefore).toEqual(ALICE)
-      await plasmoid.transfer(uid, BOB, { from: ALICE })
+      await plasmoid.transfer(uid, BOB, '0x00', { from: ALICE })
       const ownerAfter = await plasmoid.owners(uid)
       expect(ownerAfter).toEqual(BOB)
     })
 
     test('emit event', async () => {
-      const tx = await plasmoid.transfer(uid, BOB, { from: ALICE })
+      const tx = await plasmoid.transfer(uid, BOB, '0x00', { from: ALICE })
       const event = tx.logs[0]
       expect(event.event).toEqual('DidTransfer')
       expect(event.args.uid).toEqual(uid)
@@ -149,14 +149,14 @@ contract('Plasmoid', accounts => {
       expect(ownerBefore).toEqual(ALICE)
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALICE)
-      await plasmoid.transferDelegate(uid, BOB, signature)
+      await plasmoid.transferDelegate(uid, BOB, signature + '01')
       const ownerAfter = await plasmoid.owners(uid)
       expect(ownerAfter).toEqual(BOB)
     })
-    xtest('emit event', async () => {
+    test('emit event', async () => {
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALICE)
-      let tx = await plasmoid.transferDelegate(uid, BOB, signature)
+      let tx = await plasmoid.transferDelegate(uid, BOB, signature + '01')
       let event = tx.logs[0]
       expect(event.event).toEqual('DidTransfer')
       expect(event.args.owner).toEqual(ALICE)
