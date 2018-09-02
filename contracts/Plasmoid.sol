@@ -54,14 +54,6 @@ contract Plasmoid {
         emit DidTransfer(_uid, owner, _receiver);
     }
 
-    function transferDelegate (uint256 _uid, address _receiver, bytes _signature) public {
-        address owner = owners[_uid];
-        require(isValidSignature(transferDigest(_uid, _receiver), owner, _signature), "ONLY_OWNER_CAN_TRANSFER");
-
-        owners[_uid] = _receiver;
-        emit DidTransfer(_uid, owner, _receiver);
-    }
-
     function transferDigest (uint256 _uid, address _receiver) public view returns (bytes32) {
         return keccak256(abi.encodePacked("t", address(this), _uid, _receiver));
     }

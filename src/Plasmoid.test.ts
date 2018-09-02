@@ -136,7 +136,7 @@ contract('Plasmoid', accounts => {
     })
   })
 
-  describe('transferDelegate', () => {
+  describe('transfer, delegate', () => {
     let uid: BigNumber
 
     beforeEach(async () => {
@@ -150,14 +150,14 @@ contract('Plasmoid', accounts => {
       expect(ownerBefore).toEqual(ALICE)
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALICE)
-      await plasmoid.transferDelegate(uid, BOB, signature + '01')
+      await plasmoid.transfer(uid, BOB, signature + '01')
       const ownerAfter = await plasmoid.owners(uid)
       expect(ownerAfter).toEqual(BOB)
     })
     test('emit event', async () => {
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALICE)
-      let tx = await plasmoid.transferDelegate(uid, BOB, signature + '01')
+      let tx = await plasmoid.transfer(uid, BOB, signature + '01')
       let event = tx.logs[0]
       expect(event.event).toEqual('DidTransfer')
       expect(event.args.owner).toEqual(ALICE)
@@ -167,7 +167,7 @@ contract('Plasmoid', accounts => {
     test('not if not owner', async () => {
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALIEN)
-      await expect(plasmoid.transferDelegate(uid, BOB, signature + '01')).rejects.toBeTruthy()
+      await expect(plasmoid.transfer(uid, BOB, signature + '01')).rejects.toBeTruthy()
     })
   })
 })
