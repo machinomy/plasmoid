@@ -149,14 +149,19 @@ contract('Plasmoid', accounts => {
       expect(ownerBefore).toEqual(ALICE)
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALICE)
-      let tx = await plasmoid.transferDelegate(uid, BOB, signature)
-      console.log('expected', ALICE)
-      console.log(tx.logs[0].args.owner)
-      // const ownerAfter = await plasmoid.owners(uid)
-      // expect(ownerAfter).toEqual(BOB)
+      await plasmoid.transferDelegate(uid, BOB, signature)
+      const ownerAfter = await plasmoid.owners(uid)
+      expect(ownerAfter).toEqual(BOB)
     })
     xtest('emit event', async () => {
-      // Do Nothing Yet
+      let digest = await plasmoid.transferDigest(uid, BOB)
+      let signature = await web3.eth.sign(digest, ALICE)
+      let tx = await plasmoid.transferDelegate(uid, BOB, signature)
+      let event = tx.logs[0]
+      expect(event.event).toEqual('DidTransfer')
+      expect(event.args.owner).toEqual(ALICE)
+      expect(event.args.uid).toEqual(uid)
+      expect(event.args.receiver).toEqual(BOB)
     })
     xtest('not if not owner', async () => {
       // Do Nothing Yet

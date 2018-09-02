@@ -38,19 +38,21 @@ contract Plasmoid {
         emit DidDeposit(uid, msg.sender, _amount);
     }
 
-    function transfer(uint256 _uid, address receiver) public {
+    function transfer(uint256 _uid, address _receiver) public {
         address owner = owners[_uid];
-        require(owner == msg.sender, "Only owner can transfer");
-        owners[_uid] = receiver;
+        require(owner == msg.sender, "ONLY_OWNER_CAN_TRANSFER");
+        owners[_uid] = _receiver;
 
-        emit DidTransfer(_uid, owner, receiver);
+        emit DidTransfer(_uid, owner, _receiver);
     }
 
-    event Foo(address owner);
     function transferDelegate (uint256 _uid, address _receiver, bytes _signature) public {
         bytes32 recoveryDigest = ECRecovery.toEthSignedMessageHash(transferDigest(_uid, _receiver));
         address recovered = ECRecovery.recover(recoveryDigest, _signature);
-        emit Foo(recovered);
+        address owner = owners[_uid];
+        require(recovered == owner, "ONLY_OWNER_CAN_TRANSFER");
+        owners[_uid] = _receiver;
+        emit DidTransfer(_uid, owner, _receiver);
     }
 
     function transferDigest (uint256 _uid, address _receiver) public view returns (bytes32) {
