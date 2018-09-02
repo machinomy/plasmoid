@@ -15,6 +15,7 @@ contract('Plasmoid', accounts => {
 
   const ALICE = accounts[1]
   const BOB = accounts[2]
+  const ALIEN = accounts[3]
 
   let mintableToken: TestToken.Contract
   let plasmoid: contracts.Plasmoid.Contract
@@ -100,8 +101,8 @@ contract('Plasmoid', accounts => {
       const balanceAfter = await plasmoid.balanceOf(uid)
       expect(balanceAfter.toNumber()).toEqual(0)
     })
-    xtest('not if not owner', async () => {
-      // Do Nothing Yet
+    test('not if not owner', async () => {
+      await expect(plasmoid.withdraw(uid,{from: ALIEN})).rejects.toBeTruthy()
     })
   })
 
@@ -130,8 +131,8 @@ contract('Plasmoid', accounts => {
       expect(event.args.owner).toEqual(ALICE)
       expect(event.args.receiver).toEqual(BOB)
     })
-    xtest('not if not owner', async () => {
-      // Do Nothing Yet
+    test('not if not owner', async () => {
+      await expect(plasmoid.transfer(uid, BOB, '0x00', { from: ALIEN })).rejects.toBeTruthy()
     })
   })
 
@@ -163,8 +164,10 @@ contract('Plasmoid', accounts => {
       expect(event.args.uid).toEqual(uid)
       expect(event.args.receiver).toEqual(BOB)
     })
-    xtest('not if not owner', async () => {
-      // Do Nothing Yet
+    test('not if not owner', async () => {
+      let digest = await plasmoid.transferDigest(uid, BOB)
+      let signature = await web3.eth.sign(digest, ALIEN)
+      await expect(plasmoid.transferDelegate(uid, BOB, signature + '01')).rejects.toBeTruthy()
     })
   })
 })
