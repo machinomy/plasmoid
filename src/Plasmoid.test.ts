@@ -1,8 +1,9 @@
 import * as contracts from './index'
 import { BigNumber } from 'bignumber.js'
+import TestToken from '../build/wrappers/TestToken'
 
 const Plasmoid = artifacts.require<contracts.Plasmoid.Contract>('Plasmoid.sol')
-const MintableToken = artifacts.require<contracts.MintableToken.Contract>('MintableToken.sol')
+const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
 
 const MINTED = 1000
 const VALUE = 100
@@ -13,7 +14,7 @@ contract('Plasmoid', accounts => {
   const ALICE = accounts[1]
   const BOB = accounts[2]
 
-  let mintableToken: contracts.MintableToken.Contract
+  let mintableToken: TestToken.Contract
   let plasmoid: contracts.Plasmoid.Contract
 
   beforeEach(async () => {
