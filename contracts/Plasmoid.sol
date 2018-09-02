@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ECRecovery.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 
 
@@ -43,6 +44,17 @@ contract Plasmoid {
         owners[_uid] = receiver;
 
         emit DidTransfer(_uid, owner, receiver);
+    }
+
+    event Foo(address owner);
+    function transferDelegate (uint256 _uid, address _receiver, bytes _signature) public {
+        bytes32 recoveryDigest = ECRecovery.toEthSignedMessageHash(transferDigest(_uid, _receiver));
+        address recovered = ECRecovery.recover(recoveryDigest, _signature);
+        emit Foo(recovered);
+    }
+
+    function transferDigest (uint256 _uid, address _receiver) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("t", address(this), _uid, _receiver));
     }
 
     function withdraw (uint256 _uid) public {

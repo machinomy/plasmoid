@@ -8,6 +8,8 @@ const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
 const MINTED = 1000
 const VALUE = 100
 
+const web3 = (global as any).web3
+
 contract('Plasmoid', accounts => {
   const tokenOwner = accounts[0]
 
@@ -134,8 +136,24 @@ contract('Plasmoid', accounts => {
   })
 
   describe('transferDelegate', () => {
-    xtest('change ownership', async () => {
-      // Do Nothing Yet
+    let uid: BigNumber
+
+    beforeEach(async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
+      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      uid = tx.logs[0].args.uid as BigNumber
+    })
+
+    test('change ownership', async () => {
+      const ownerBefore = await plasmoid.owners(uid)
+      expect(ownerBefore).toEqual(ALICE)
+      let digest = await plasmoid.transferDigest(uid, BOB)
+      let signature = await web3.eth.sign(digest, ALICE)
+      let tx = await plasmoid.transferDelegate(uid, BOB, signature)
+      console.log('expected', ALICE)
+      console.log(tx.logs[0].args.owner)
+      // const ownerAfter = await plasmoid.owners(uid)
+      // expect(ownerAfter).toEqual(BOB)
     })
     xtest('emit event', async () => {
       // Do Nothing Yet
