@@ -98,6 +98,9 @@ contract('Plasmoid', accounts => {
       const balanceAfter = await plasmoid.balanceOf(uid)
       expect(balanceAfter.toNumber()).toEqual(0)
     })
+    xtest('not if not owner', async () => {
+      // Do Nothing Yet
+    })
   })
 
   describe('transfer', () => {
@@ -124,6 +127,21 @@ contract('Plasmoid', accounts => {
       expect(event.args.uid).toEqual(uid)
       expect(event.args.owner).toEqual(ALICE)
       expect(event.args.receiver).toEqual(BOB)
+    })
+    xtest('not if not owner', async () => {
+      // Do Nothing Yet
+    })
+  })
+
+  describe('transferDelegate', () => {
+    xtest('change ownership', async () => {
+      // Do Nothing Yet
+    })
+    xtest('emit event', async () => {
+      // Do Nothing Yet
+    })
+    xtest('not if not owner', async () => {
+      // Do Nothing Yet
     })
   })
 })
