@@ -20,6 +20,7 @@ contract Plasmoid {
     event DidDeposit(uint256 indexed uid, address indexed owner, uint256 amount);
     event DidWithdraw(uint256 indexed uid, address indexed owner, uint256 amount);
     event DidTransfer(uint256 indexed uid, address indexed owner, address indexed receiver);
+    event DidCheckpoint(uint256 indexed uid, bytes32 hash);
 
     enum SignatureType {
         Caller, // 0x00
@@ -83,5 +84,12 @@ contract Plasmoid {
         delete owners[_uid];
 
         emit DidWithdraw(uid, owner, amount);
+    }
+
+    function checkpoint () public {
+        address owner = owners[uid];
+        require(owner == msg.sender, "Only owner can checkpoint");
+        bytes32 hash = keccak256(uid);
+        emit DidCheckpoint(uid, hash);
     }
 }
