@@ -13,7 +13,8 @@ contract Plasmoid {
     mapping (uint256 => uint256) private balances;
     mapping (uint256 => address) public owners;
 
-    uint256 public uid;
+    uint256 public channelId;
+    uint256 public checkpointId;
 
     StandardToken public token;
 
@@ -24,13 +25,13 @@ contract Plasmoid {
 
     enum SignatureType {
         Caller, // 0x00
-        EthSign, // 0x01
-        MAX
+        EthSign // 0x01
     }
 
     constructor (address _tokenAddress) public {
         token = StandardToken(_tokenAddress);
-        uid = 0;
+        channelId = 0;
+        checkpointId = 0;
     }
 
     function balanceOf (uint256 _uid) public view returns (uint256) {
@@ -40,11 +41,11 @@ contract Plasmoid {
     function deposit (uint256 _amount) public {
         require(_amount > 0, "Can not deposit 0");
         require(token.transferFrom(msg.sender, address(this), _amount));
-        uid = uid.add(1);
-        balances[uid] = _amount;
-        owners[uid] = msg.sender;
+        channelId = channelId.add(1);
+        balances[channelId] = _amount;
+        owners[channelId] = msg.sender;
 
-        emit DidDeposit(uid, msg.sender, _amount);
+        emit DidDeposit(channelId, msg.sender, _amount);
     }
 
     function transfer(uint256 _uid, address _receiver, bytes _signature) public {
@@ -61,7 +62,6 @@ contract Plasmoid {
 
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {
         uint8 signatureTypeRaw = uint8(_signature.popLastByte());
-        require(signatureTypeRaw < uint8(SignatureType.MAX), "SIGNATURE_UNSUPPORTED");
         SignatureType signatureType = SignatureType(signatureTypeRaw);
         if (signatureType == SignatureType.Caller) {
             return msg.sender == _signatory;
@@ -83,13 +83,14 @@ contract Plasmoid {
         delete balances[_uid];
         delete owners[_uid];
 
-        emit DidWithdraw(uid, owner, amount);
+        emit DidWithdraw(channelId, owner, amount);
     }
 
-    function checkpoint () public {
-        address owner = owners[uid];
+    function checkpoint (bytes32 _hash, bytes _signature) public {
+        address owner = owners[channelId];
         require(owner == msg.sender, "Only owner can checkpoint");
-        bytes32 hash = keccak256(uid);
-        emit DidCheckpoint(uid, hash);
+        require(isValidSignature(_hash, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
+        checkpointId = checkpointId.add(1);
+        emit DidCheckpoint(checkpointId);
     }
 }
