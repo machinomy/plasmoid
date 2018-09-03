@@ -18,10 +18,10 @@ contract Plasmoid {
 
     StandardToken public token;
 
-    event DidDeposit(uint256 indexed uid, address indexed owner, uint256 amount);
-    event DidWithdraw(uint256 indexed uid, address indexed owner, uint256 amount);
-    event DidTransfer(uint256 indexed uid, address indexed owner, address indexed receiver);
-    event DidCheckpoint(uint256 indexed uid, bytes32 hash);
+    event DidDeposit(uint256 indexed channelId, address indexed owner, uint256 amount);
+    event DidWithdraw(uint256 indexed channelId, address indexed owner, uint256 amount);
+    event DidTransfer(uint256 indexed channelId, address indexed owner, address indexed receiver);
+    event DidCheckpoint(uint256 indexed checkpointId);
 
     enum SignatureType {
         Caller, // 0x00

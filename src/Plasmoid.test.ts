@@ -1,3 +1,4 @@
+import * as util from 'ethereumjs-util'
 import * as contracts from './index'
 import { BigNumber } from 'bignumber.js'
 import TestToken from '../build/wrappers/TestToken'
@@ -9,6 +10,7 @@ const MINTED = 1000
 const VALUE = 100
 
 const web3 = (global as any).web3
+const elements = [1, 2, 3].map(e => util.sha3(e))
 
 contract('Plasmoid', accounts => {
   const tokenOwner = accounts[0]
@@ -168,6 +170,27 @@ contract('Plasmoid', accounts => {
       let digest = await plasmoid.transferDigest(uid, BOB)
       let signature = await web3.eth.sign(digest, ALIEN)
       await expect(plasmoid.transfer(uid, BOB, signature + '01')).rejects.toBeTruthy()
+    })
+  })
+
+  describe('checkpoint', () => {
+    let uid: BigNumber, uid2: BigNumber
+
+    beforeEach(async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      const tx2 = await plasmoid.deposit(VALUE + 10, { from: ALICE })
+      uid = tx.logs[0].args.uid as BigNumber
+      uid2 = tx.logs[0].args.uid as BigNumber
+    })
+
+    test('Checkpoint', async () => {
+      const digest = '0x1234'
+      const signature = await web3.eth.sign(digest, ALICE)
+      const checkpointIdBefore: BigNumber = await plasmoid.checkpointId()
+      const tx = await plasmoid.checkpoint(digest, signature, { from: ALICE })
+      const checkpointIdAfter: BigNumber = tx.logs[0].args.checkpointId
+      expect(checkpointIdAfter.toNumber()).toBeGreaterThan(checkpointIdBefore.toNumber())
     })
   })
 })

@@ -9,6 +9,7 @@
     "noImplicitReturns": true,   // Report error when not all code paths in function return a value
     "types": [
       "@machinomy/types-ethereumjs-units",
+      "@machinomy/types-ethereumjs-util",
       "@machinomy/types-web3",
       "@machinomy/types-truffle",
       "@machinomy/types-truffle-contract",
