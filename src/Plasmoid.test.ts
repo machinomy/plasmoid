@@ -2,6 +2,8 @@ import * as util from 'ethereumjs-util'
 import * as contracts from './index'
 import { BigNumber } from 'bignumber.js'
 import TestToken from '../build/wrappers/TestToken'
+import MerkleTree from './MerkleTree'
+import { Buffer } from 'safe-buffer'
 
 const Plasmoid = artifacts.require<contracts.Plasmoid.Contract>('Plasmoid.sol')
 const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
@@ -191,6 +193,36 @@ contract('Plasmoid', accounts => {
       const tx = await plasmoid.checkpoint(digest, signature, { from: ALICE })
       const checkpointIdAfter: BigNumber = tx.logs[0].args.checkpointId
       expect(checkpointIdAfter.toNumber()).toBeGreaterThan(checkpointIdBefore.toNumber())
+    })
+  })
+
+  describe('withdrawal with checkpoints', () => {
+    let uid: BigNumber, uid2: BigNumber
+    let tree: MerkleTree
+    let proof: string
+
+    beforeEach(async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      const tx2 = await plasmoid.deposit(VALUE + 10, { from: ALICE })
+      tree = new MerkleTree([util.toBuffer('0x1234'), util.toBuffer('0xcafe'), util.toBuffer('0xbeef'),
+        util.toBuffer('0x1111'), util.toBuffer('0x2222'), util.toBuffer('0x3333'), util.toBuffer('0x4444')])
+      let p = Buffer.concat(tree.proof(util.toBuffer('cafe')))
+      proof = util.bufferToHex(p)
+      uid = tx.logs[0].args.uid as BigNumber
+      uid2 = tx.logs[0].args.uid as BigNumber
+    })
+
+    test('Withdrawal', async () => {
+      const digest = '0x1234'
+      const merkleRoot = tree.root
+      const merkleProof = proof
+      const signature = await web3.eth.sign(digest, ALICE)
+      const tx = await plasmoid.checkpoint(digest, signature, { from: ALICE })
+      const checkpointUid = tx.logs[0].args.uid
+      const tx2 = await plasmoid.withdrawWithCheckpoint(checkpointUid, merkleRoot.toString(), merkleProof,  uid, { from: ALICE })
+      console.log(JSON.stringify(tx2.logs[0].args))
+      expect(tx2.logs[0].event).toEqual('DidWithdrawWithCheckpoint')
     })
   })
 })

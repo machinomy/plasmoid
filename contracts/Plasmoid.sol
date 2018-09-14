@@ -12,6 +12,7 @@ contract Plasmoid {
 
     mapping (uint256 => uint256) private balances;
     mapping (uint256 => address) public owners;
+    mapping (uint256 => Checkpoint) public checkpoints;
 
     uint256 public channelId;
     uint256 public checkpointId;
@@ -20,12 +21,18 @@ contract Plasmoid {
 
     event DidDeposit(uint256 indexed channelId, address indexed owner, uint256 amount);
     event DidWithdraw(uint256 indexed channelId, address indexed owner, uint256 amount);
+    event DidWithdrawWithCheckpoint(uint256 indexed checkpointId, uint256 indexed channelId, address indexed owner, uint256 amount);
     event DidTransfer(uint256 indexed channelId, address indexed owner, address indexed receiver);
     event DidCheckpoint(uint256 indexed checkpointId);
 
     enum SignatureType {
         Caller, // 0x00
         EthSign // 0x01
+    }
+
+    struct Checkpoint {
+        address owner;
+        bytes32 hash;
     }
 
     constructor (address _tokenAddress) public {
@@ -48,7 +55,7 @@ contract Plasmoid {
         emit DidDeposit(channelId, msg.sender, _amount);
     }
 
-    function transfer(uint256 _uid, address _receiver, bytes _signature) public {
+    function transfer (uint256 _uid, address _receiver, bytes _signature) public {
         address owner = owners[_uid];
         require(isValidSignature(transferDigest(_uid, _receiver), owner, _signature), "ONLY_OWNER_CAN_TRANSFER");
         owners[_uid] = _receiver;
@@ -86,11 +93,47 @@ contract Plasmoid {
         emit DidWithdraw(channelId, owner, amount);
     }
 
+    function withdrawWithCheckpoint (uint256 _checkpointId, bytes32 _merkleRoot, bytes _merkleProof, uint256 _channelId) public {
+        address owner = checkpoints[_checkpointId].owner;
+        uint256 amount = balances[_channelId];
+
+        require(amount > 0, "Balance is 0");
+        require(owner == msg.sender, "Only owner can withdraw");
+        require(token.transfer(owner, amount), "Can not transfer tokens");
+        require(isContained(_merkleRoot, _merkleProof, keccak256(_channelId, owner)), "Payment data is not in Merkle Root");
+
+        delete balances[_channelId];
+        delete owners[_channelId];
+        delete checkpoints[_checkpointId];
+
+        emit DidWithdrawWithCheckpoint(_checkpointId, _channelId, owner, amount);
+    }
+
     function checkpoint (bytes32 _hash, bytes _signature) public {
         address owner = owners[channelId];
         require(owner == msg.sender, "Only owner can checkpoint");
         require(isValidSignature(_hash, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
         checkpointId = checkpointId.add(1);
+        checkpoints[checkpointId] = Checkpoint({owner: owner, hash: _hash});
+
         emit DidCheckpoint(checkpointId);
+    }
+
+    function isContained(bytes32 merkleRoot, bytes _proof, bytes32 _datahash) public view returns (bool) {
+        bytes32 proofElement;
+        bytes32 cursor = _datahash;
+        bool result = false;
+
+            for (uint256 i = 32; i <= _proof.length; i += 32) {
+                assembly { proofElement := mload(add(_proof, i)) } // solium-disable-line security/no-inline-assembly
+
+                if (cursor < proofElement) {
+                    cursor = keccak256(cursor, proofElement);
+                } else {
+                    cursor = keccak256(proofElement, cursor);
+                }
+            }
+            result = cursor == merkleRoot;
+        return result;
     }
 }
