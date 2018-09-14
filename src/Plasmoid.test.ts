@@ -14,6 +14,31 @@ const VALUE = 100
 const web3 = (global as any).web3
 const elements = [1, 2, 3].map(e => util.sha3(e))
 
+function makePaymentDigest (channelId: string, amount: BigNumber, owner: string): string {
+  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
+  const concatenatedPaymentArray = Buffer.concat(paymentArray)
+  const digestBuffer = util.sha256(concatenatedPaymentArray)
+  const digest = digestBuffer.toString()
+  return digest
+}
+
+function makeMerkleRoot (channelId: string, amount: BigNumber, owner: string): string {
+  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
+  const tree = new MerkleTree(paymentArray)
+  const merkleRoot = tree.root
+  const merkleRootAsString = merkleRoot.toString()
+  return merkleRootAsString
+}
+
+function makeMerkleProof (channelId: string, amount: BigNumber, owner: string): Buffer {
+  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
+  const concatenatedPaymentArray = Buffer.concat(paymentArray)
+  const tree = new MerkleTree(paymentArray)
+  const proofBuffer = Buffer.concat(tree.proof(concatenatedPaymentArray))
+  return proofBuffer
+}
+
+
 contract('Plasmoid', accounts => {
   const tokenOwner = accounts[0]
 
@@ -198,31 +223,32 @@ contract('Plasmoid', accounts => {
 
   describe('withdrawal with checkpoints', () => {
     let uid: BigNumber, uid2: BigNumber
-    let tree: MerkleTree
-    let proof: string
 
     beforeEach(async () => {
       await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
       const tx = await plasmoid.deposit(VALUE, { from: ALICE })
       const tx2 = await plasmoid.deposit(VALUE + 10, { from: ALICE })
-      tree = new MerkleTree([util.toBuffer('0x1234'), util.toBuffer('0xcafe'), util.toBuffer('0xbeef'),
-        util.toBuffer('0x1111'), util.toBuffer('0x2222'), util.toBuffer('0x3333'), util.toBuffer('0x4444')])
-      let p = Buffer.concat(tree.proof(util.toBuffer('cafe')))
-      proof = util.bufferToHex(p)
       uid = tx.logs[0].args.uid as BigNumber
       uid2 = tx.logs[0].args.uid as BigNumber
     })
 
     test('Withdrawal', async () => {
-      const digest = '0x1234'
-      const merkleRoot = tree.root
-      const merkleProof = proof
+      const channelId = 0xcafe
+      const digest = makePaymentDigest(channelId.toString(), new BigNumber(10), ALICE)
+      const merkleProof = makeMerkleProof(channelId.toString(), new BigNumber(10), ALICE)
       const signature = await web3.eth.sign(digest, ALICE)
       const tx = await plasmoid.checkpoint(digest, signature, { from: ALICE })
       const checkpointUid = tx.logs[0].args.uid
-      const tx2 = await plasmoid.withdrawWithCheckpoint(checkpointUid, merkleRoot.toString(), merkleProof,  uid, { from: ALICE })
-      console.log(JSON.stringify(tx2.logs[0].args))
-      expect(tx2.logs[0].event).toEqual('DidWithdrawWithCheckpoint')
+
+      const digest2 = makePaymentDigest(channelId.toString(), new BigNumber(20), ALICE)
+      const merkleProof2 = makeMerkleProof(channelId.toString(), new BigNumber(20), ALICE)
+      const signature2 = await web3.eth.sign(digest2, ALICE)
+      const tx2 = await plasmoid.checkpoint(digest2, signature2, { from: ALICE })
+      const checkpointUid2 = tx.logs[0].args.uid
+
+      const tx3 = await plasmoid.withdrawWithCheckpoint(checkpointUid2, merkleProof2.toString(), channelId, { from: ALICE })
+      console.log(JSON.stringify(tx3.logs[0].args))
+      expect(tx3.logs[0].event).toEqual('DidWithdrawWithCheckpoint')
     })
   })
 })
