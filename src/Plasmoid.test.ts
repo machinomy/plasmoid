@@ -14,26 +14,38 @@ const VALUE = 100
 const web3 = (global as any).web3
 const elements = [1, 2, 3].map(e => util.sha3(e))
 
-function makePaymentDigest (channelId: string, amount: BigNumber, owner: string): string {
-  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
+export interface PlasmaPayment {
+  channelId: BigNumber,
+  amount: BigNumber,
+  owner: string
+}
+
+function makePaymentDigest (payment: PlasmaPayment): string {
+  const paymentArray = [util.toBuffer(payment.channelId), util.toBuffer(payment.amount), util.toBuffer(payment.owner)]
   const concatenatedPaymentArray = Buffer.concat(paymentArray)
   const digestBuffer = util.sha256(concatenatedPaymentArray)
   const digest = digestBuffer.toString()
   return digest
 }
 
-function makeMerkleRoot (channelId: string, amount: BigNumber, owner: string): string {
-  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
-  const tree = new MerkleTree(paymentArray)
+function makeMerkleRoot (payments: PlasmaPayment[]): string {
+  let acc: Buffer[] = []
+  for (let p of payments) {
+    acc.concat([util.toBuffer(p.channelId), util.toBuffer(p.amount), util.toBuffer(p.owner)])
+  }
+  const tree = new MerkleTree(acc)
   const merkleRoot = tree.root
   const merkleRootAsString = merkleRoot.toString()
   return merkleRootAsString
 }
 
-function makeMerkleProof (channelId: string, amount: BigNumber, owner: string): Buffer {
-  const paymentArray = [util.toBuffer(channelId), util.toBuffer(amount), util.toBuffer(owner)]
-  const concatenatedPaymentArray = Buffer.concat(paymentArray)
-  const tree = new MerkleTree(paymentArray)
+function makeMerkleProof (payments: PlasmaPayment[]): Buffer {
+  let acc: Buffer[] = []
+  for (let p of payments) {
+    acc.concat([util.toBuffer(p.channelId), util.toBuffer(p.amount), util.toBuffer(p.owner)])
+  }
+  const concatenatedPaymentArray = Buffer.concat(acc)
+  const tree = new MerkleTree(acc)
   const proofBuffer = Buffer.concat(tree.proof(concatenatedPaymentArray))
   return proofBuffer
 }
@@ -233,15 +245,21 @@ contract('Plasmoid', accounts => {
     })
 
     test('Withdrawal', async () => {
-      const channelId = 0xcafe
-      const digest = makePaymentDigest(channelId.toString(), new BigNumber(10), ALICE)
-      const merkleProof = makeMerkleProof(channelId.toString(), new BigNumber(10), ALICE)
+      const channelId = new BigNumber(0xcafe)
+      const paymentArray: PlasmaPayment[] = []
+      const payment1: PlasmaPayment = { channelId: channelId, amount: new BigNumber(10), owner: ALICE }
+      paymentArray.push(payment1)
+
+      const digest = makePaymentDigest(payment1)
+      const merkleProof = makeMerkleProof(paymentArray)
       const signature = await web3.eth.sign(digest, ALICE)
       const tx = await plasmoid.checkpoint(digest, signature, { from: ALICE })
       const checkpointUid = tx.logs[0].args.uid
 
-      const digest2 = makePaymentDigest(channelId.toString(), new BigNumber(20), ALICE)
-      const merkleProof2 = makeMerkleProof(channelId.toString(), new BigNumber(20), ALICE)
+      const payment2: PlasmaPayment = { channelId: channelId, amount: new BigNumber(20), owner: ALICE }
+      paymentArray.push(payment2)
+      const digest2 = makePaymentDigest(payment2)
+      const merkleProof2 = makeMerkleProof(paymentArray)
       const signature2 = await web3.eth.sign(digest2, ALICE)
       const tx2 = await plasmoid.checkpoint(digest2, signature2, { from: ALICE })
       const checkpointUid2 = tx.logs[0].args.uid
