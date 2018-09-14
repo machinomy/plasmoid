@@ -93,14 +93,16 @@ contract Plasmoid {
         emit DidWithdraw(channelId, owner, amount);
     }
 
-    function withdrawWithCheckpoint (uint256 _checkpointId, bytes32 _merkleRoot, bytes _merkleProof, uint256 _channelId) public {
+    function withdrawWithCheckpoint (uint256 _checkpointId, bytes _merkleProof, uint256 _channelId) public {
         address owner = checkpoints[_checkpointId].owner;
+        bytes32 checkpoint = checkpoints[_checkpointId].hash;
+
         uint256 amount = balances[_channelId];
 
         require(amount > 0, "Balance is 0");
         require(owner == msg.sender, "Only owner can withdraw");
         require(token.transfer(owner, amount), "Can not transfer tokens");
-        require(isContained(_merkleRoot, _merkleProof, keccak256(_channelId, owner)), "Payment data is not in Merkle Root");
+        require(isContained(checkpoint, _merkleProof, keccak256(_channelId, amount, owner)), "Payment data is not in Merkle Root");
 
         delete balances[_channelId];
         delete owners[_channelId];
