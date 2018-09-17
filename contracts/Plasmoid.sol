@@ -3,10 +3,11 @@ pragma solidity ^0.4.24;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./LibBytes.sol";
 
 
-contract Plasmoid {
+contract Plasmoid is Ownable {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
@@ -35,7 +36,7 @@ contract Plasmoid {
         bytes32 hash;
     }
 
-    constructor (address _tokenAddress) public {
+    constructor (address _tokenAddress) public Ownable() {
         token = StandardToken(_tokenAddress);
         channelId = 0;
         checkpointId = 0;
@@ -112,8 +113,6 @@ contract Plasmoid {
     }
 
     function checkpoint (bytes32 _hash, bytes _signature) public {
-        address owner = owners[channelId];
-        require(owner == msg.sender, "Only owner can checkpoint");
         require(isValidSignature(_hash, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
         checkpointId = checkpointId.add(1);
         checkpoints[checkpointId] = Checkpoint({owner: owner, hash: _hash});

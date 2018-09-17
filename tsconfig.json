@@ -27,6 +27,7 @@
     "src/**/*.ts",
     "migrations/**/*.ts",
     "test/**/*.ts",
-    "types/**/*.d.ts"
+    "types/**/*.d.ts",
+    "./node_modules/types-bn/index.d.ts"
   ]
 }
