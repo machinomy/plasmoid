@@ -32,8 +32,8 @@ contract Plasmoid is Ownable {
     }
 
     struct Checkpoint {
-        address owner;
-        bytes32 hash;
+        bytes32 merkleRoot;
+        uint256 amount;
     }
 
     constructor (address _tokenAddress) public Ownable() {
@@ -42,8 +42,8 @@ contract Plasmoid is Ownable {
         checkpointId = 0;
     }
 
-    function balanceOf (uint256 _uid) public view returns (uint256) {
-        return balances[_uid];
+    function balanceOf (uint256 _channelId) public view returns (uint256) {
+        return balances[_channelId];
     }
 
     function deposit (uint256 _amount) public {
@@ -56,16 +56,16 @@ contract Plasmoid is Ownable {
         emit DidDeposit(channelId, msg.sender, _amount);
     }
 
-    function transfer (uint256 _uid, address _receiver, bytes _signature) public {
-        address owner = owners[_uid];
-        require(isValidSignature(transferDigest(_uid, _receiver), owner, _signature), "ONLY_OWNER_CAN_TRANSFER");
-        owners[_uid] = _receiver;
+    function transfer (uint256 _channelId, address _receiver, bytes _signature) public {
+        address owner = owners[_channelId];
+        require(isValidSignature(transferDigest(_channelId, _receiver), owner, _signature), "ONLY_OWNER_CAN_TRANSFER");
+        owners[_channelId] = _receiver;
 
-        emit DidTransfer(_uid, owner, _receiver);
+        emit DidTransfer(_channelId, owner, _receiver);
     }
 
-    function transferDigest (uint256 _uid, address _receiver) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("t", address(this), _uid, _receiver));
+    function transferDigest (uint256 _channelId, address _receiver) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("t", address(this), _channelId, _receiver));
     }
 
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {
@@ -95,27 +95,29 @@ contract Plasmoid is Ownable {
     }
 
     function withdrawWithCheckpoint (uint256 _checkpointId, bytes _merkleProof, uint256 _channelId) public {
-        address owner = checkpoints[_checkpointId].owner;
-        bytes32 checkpoint = checkpoints[_checkpointId].hash;
+        address owner = owners[_channelId];
+        uint256 checkpointAmount = checkpoints[_checkpointId].amount;
+        bytes32 merkleRoot = checkpoints[_checkpointId].merkleRoot;
+        uint256 channelAmount = balances[_channelId];
+        bytes32 stateDigest = keccak256(abi.encodePacked(_channelId, channelAmount, owner));
 
-        uint256 amount = balances[_channelId];
-
-        require(amount > 0, "Balance is 0");
+        require(channelAmount > 0, "Balance is 0");
         require(owner == msg.sender, "Only owner can withdraw");
-        require(token.transfer(owner, amount), "Can not transfer tokens");
-        require(isContained(checkpoint, _merkleProof, keccak256(_channelId, amount, owner)), "Payment data is not in Merkle Root");
+        require(checkpointAmount == channelAmount, "Checkpoint amount must be equal to channel amount");
+        require(isContained(merkleRoot, _merkleProof, stateDigest), "State data is not in Merkle Root");
+        require(token.transfer(owner, channelAmount), "Can not transfer tokens to owner");
 
         delete balances[_channelId];
         delete owners[_channelId];
         delete checkpoints[_checkpointId];
 
-        emit DidWithdrawWithCheckpoint(_checkpointId, _channelId, owner, amount);
+        emit DidWithdrawWithCheckpoint(_checkpointId, _channelId, owner, channelAmount);
     }
 
-    function checkpoint (bytes32 _hash, bytes _signature) public {
-        require(isValidSignature(_hash, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
+    function checkpoint (bytes32 _merkleRoot, uint256 amount, bytes _signature) public {
+        require(isValidSignature(_merkleRoot, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
         checkpointId = checkpointId.add(1);
-        checkpoints[checkpointId] = Checkpoint({owner: owner, hash: _hash});
+        checkpoints[checkpointId] = Checkpoint({ amount: amount, merkleRoot: _merkleRoot });
 
         emit DidCheckpoint(checkpointId);
     }

@@ -6184,7 +6184,7 @@ truffle-compile@^3.0.4:
     colors "^1.1.2"
     debug "^3.1.0"
     graphlib "^2.1.1"
-    solc "0.4.24"
+    solc "0.4.25"
     truffle-config "^1.0.6"
     truffle-contract-sources "^0.0.2"
     truffle-error "^0.0.3"
@@ -6202,7 +6202,7 @@ truffle-compile@^4.0.0-beta.0:
     request "^2.85.0"
     request-promise "^4.2.2"
     require-from-string "^2.0.2"
-    solc "0.4.24"
+    solc "0.4.25"
     truffle-config "^1.1.0-beta.0"
     truffle-contract-sources "^0.1.0-beta.0"
     truffle-error "^0.0.3"
@@ -6546,7 +6546,7 @@ truffle@^5.0.0-beta.0:
   dependencies:
     mocha "^4.1.0"
     original-require "1.0.1"
-    solc "0.4.24"
+    solc "0.4.25"
 
 ts-jest@^23.1.4:
   version "23.1.4"
