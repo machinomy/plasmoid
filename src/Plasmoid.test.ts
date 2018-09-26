@@ -39,7 +39,6 @@ export class PlasmaState {
     const channelIdBuffer = util.setLengthLeft(util.toBuffer(numberToBN(this.channelId)), 32)
     const amountBuffer = util.setLengthLeft((util.toBuffer(numberToBN(this.amount))), 32)
     const ownerBuffer = util.toBuffer(this.owner)
-    console.log(Buffer.concat([channelIdBuffer, amountBuffer, ownerBuffer]).toString('hex'))
     return Buffer.concat([channelIdBuffer, amountBuffer, ownerBuffer])
   }
 }
@@ -99,7 +98,7 @@ contract('Plasmoid', accounts => {
       accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(0), BOB))
     })
 
-    test('Withdrawal', async () => {
+    test('usual case', async (done) => {
       let accountHashesArray: Buffer[] = []
 
       accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(90), ALICE))
@@ -116,8 +115,10 @@ contract('Plasmoid', accounts => {
       const signature = await sign(PLASMOID_OWNER, merkleRoot)
       const recoveredAddress = recover(signature, merkleRoot)
 
+      await plasmoid.setSettlingPeriod(1)
+
       // Do the first checkpoint
-      const tx = await plasmoid.checkpoint(merkleRoot, accountsState.get(BOB)!.amount, signature, { from: PLASMOID_OWNER })
+      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
       const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
       const checkpointUid = eventArgs.checkpointId as BigNumber
 
@@ -137,7 +138,7 @@ contract('Plasmoid', accounts => {
       const signature2 = await sign(PLASMOID_OWNER, merkleRoot2)
 
       // Do the second checkpoint
-      const tx2 = await plasmoid.checkpoint(merkleRoot2, accountsState.get(BOB)!.amount, signature2, { from: PLASMOID_OWNER })
+      const tx2 = await plasmoid.checkpoint(merkleRoot2, signature2, { from: PLASMOID_OWNER })
       const eventArgs2: PlasmoidWrapper.DidCheckpoint = tx2.logs[0].args
       const checkpointUid2 = eventArgs2.checkpointId as BigNumber
 
@@ -147,13 +148,98 @@ contract('Plasmoid', accounts => {
       // Do transfer ownership of channel from ALICE to BOB
       const transferDigest = await plasmoid.transferDigest(channelId, BOB)
       const transferSignature = await sign(ALICE, transferDigest)
+      await plasmoid.transfer(channelId, BOB, transferSignature)
+
+      // Do withdrawal with checkpoint
+      const tx3 = await plasmoid.startWithdraw(checkpointUid2, concatenatedProofAsString, channelId, { from: BOB })
+      const eventArgs3: PlasmoidWrapper.DidAddToExitingQueue = tx3.logs[0].args
+      expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx3.logs[0]))
+      expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx3.logs[1]))
+      const withdrawalRequestID = eventArgs3.withdrawalRequestID
+
+      // Some delay for time increasing
+      setTimeout(async () => {
+        const tx4 = await plasmoid.finalizeWithdraw(withdrawalRequestID)
+        expect(tx4.logs[0] && PlasmoidWrapper.isDidFinalizeWithdrawEvent(tx4.logs[0])).toBeTruthy()
+        done()
+      }, 2500)
+    })
+
+    test('withdraw in settling period', async () => {
+      let accountHashesArray: Buffer[] = []
+
+      let tree = new MerkleTree(accountHashesArray)
+
+      accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
+      accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
+
+      accountHashesArray = []
+      const digest21: Buffer = makeStateDigest(ALICE)
+      const digest22: Buffer = makeStateDigest(BOB)
+      accountHashesArray.push(digest21)
+      accountHashesArray.push(digest22)
+
+      tree = new MerkleTree(accountHashesArray)
+      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
+
+      const merkleProof: Buffer[] = tree.proof(digest22)
+      const signature = await sign(PLASMOID_OWNER, merkleRoot)
+
+      const tx1 = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+      const eventArgs: PlasmoidWrapper.DidCheckpoint = tx1.logs[0].args
+      const checkpointUid = eventArgs.checkpointId as BigNumber
+
+      const concat: Buffer = Buffer.concat(merkleProof)
+      const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
+
+      const transferDigest = await plasmoid.transferDigest(channelId, BOB)
+      const transferSignature = await sign(ALICE, transferDigest)
+      await plasmoid.transfer(channelId, BOB, transferSignature)
+
+      const tx2 = await plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })
+      const eventArgs2: PlasmoidWrapper.DidAddToExitingQueue = tx2.logs[0].args
+      expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx2.logs[0]))
+      expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx2.logs[1]))
+      const withdrawalRequestID = eventArgs2.withdrawalRequestID
+
+      const tx4 = await plasmoid.finalizeWithdraw(withdrawalRequestID)
+      expect(tx4.logs[0]).toBeFalsy()
+    })
+
+    test('withdrawal with invalid merkle root', async () => {
+      let accountHashesArray: Buffer[] = []
+
+      let tree = new MerkleTree(accountHashesArray)
+
+      accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
+      accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
+
+      accountHashesArray = []
+      const digest21: Buffer = makeStateDigest(ALICE)
+      const digest22: Buffer = makeStateDigest(BOB)
+      accountHashesArray.push(digest21)
+      accountHashesArray.push(digest22)
+
+      tree = new MerkleTree(accountHashesArray)
+      // Reverse string
+      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex').split('').reverse().join(''))
+
+      const merkleProof: Buffer[] = tree.proof(digest22)
+      const signature = await sign(PLASMOID_OWNER, merkleRoot)
+
+      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+      const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
+      const checkpointUid = eventArgs.checkpointId as BigNumber
+
+      const concat: Buffer = Buffer.concat(merkleProof)
+      const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
+
+      const transferDigest = await plasmoid.transferDigest(channelId, BOB)
+      const transferSignature = await sign(ALICE, transferDigest)
       const transferTx = await plasmoid.transfer(channelId, BOB, transferSignature)
       const eventTransferArgs: PlasmoidWrapper.DidTransfer = transferTx.logs[0].args
 
-      // Do withdrawal with checkpoint
-      const tx3 = await plasmoid.withdrawWithCheckpoint(checkpointUid2, concatenatedProofAsString, channelId, { from: BOB })
-      const eventArgs3: PlasmoidWrapper.DidWithdrawWithCheckpoint = tx3.logs[0].args
-      expect(PlasmoidWrapper.isDidWithdrawWithCheckpointEvent(tx3.logs[0]))
+      await expect(plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })).rejects.toBeTruthy()
     })
   })
 
@@ -186,11 +272,19 @@ contract('Plasmoid', accounts => {
 
       const signature = await sign(PLASMOID_OWNER, merkleRoot)
 
-      const checkpointIdBefore: BigNumber = await plasmoid.checkpointId()
-      const tx = await plasmoid.checkpoint(merkleRoot, accountsState.get(BOB)!.amount, signature, { from: PLASMOID_OWNER })
+      const checkpointIdBefore: BigNumber = await plasmoid.checkpointIdNow()
+      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
       const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-      const checkpointIdAfter: BigNumber = await plasmoid.checkpointId()
+      const checkpointIdAfter: BigNumber = await plasmoid.checkpointIdNow()
       expect(checkpointIdAfter.toNumber()).toBeGreaterThan(checkpointIdBefore.toNumber())
+    })
+
+    test('Invalid checkpoint\'s signature', async () => {
+      const merkleRoot: string = '0xcafe'
+
+      const signature = await sign(ALICE, merkleRoot)
+
+      await expect(plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })).rejects.toBeTruthy()
     })
   })
 
