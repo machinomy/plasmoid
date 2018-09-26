@@ -129,7 +129,7 @@ contract Plasmoid is Ownable {
         emit DidStartWithdraw(_checkpointId, _channelId, owner, channelAmount);
     }
 
-    function addToExitingQueue (address _owner, uint256 _channelAmount, uint256 _channelId, uint256 _checkpointId) public {
+    function addToExitingQueue (address _owner, uint256 _channelAmount, uint256 _channelId, uint256 _checkpointId) internal {
         bytes32 _stateDigest = keccak256(abi.encodePacked(_channelId, _channelAmount, _owner));
         exitQueue[_stateDigest] = ExitQueueElement({ channelId: _channelId, channelAmount: _channelAmount, owner: _owner, checkpointId: _checkpointId, withdrawalRequestMoment: block.timestamp });
         emit DidAddToExitingQueue(_channelId, _channelAmount, _owner, _checkpointId, exitQueue[_stateDigest].withdrawalRequestMoment, _stateDigest);
@@ -141,16 +141,15 @@ contract Plasmoid is Ownable {
         uint256 _checkpointId = exitQueue[_withdrawalRequestID].checkpointId;
         uint256 _channelAmount = exitQueue[_withdrawalRequestID].channelAmount;
         address _owner = exitQueue[_withdrawalRequestID].owner;
-        if (_withdrawalRequestMoment + settlingPeriod < block.timestamp) {
-            require(token.transfer(_owner, _channelAmount), "Can not transfer tokens to owner");
+        require(_withdrawalRequestMoment + settlingPeriod < block.timestamp);
+        require(token.transfer(_owner, _channelAmount), "Can not transfer tokens to owner");
 
-            delete balances[_channelId];
-            delete owners[_channelId];
-            delete checkpoints[_checkpointId];
-            delete exitQueue[_withdrawalRequestID];
+        delete balances[_channelId];
+        delete owners[_channelId];
+        delete checkpoints[_checkpointId];
+        delete exitQueue[_withdrawalRequestID];
 
-            emit DidFinalizeWithdraw(_withdrawalRequestID);
-        }
+        emit DidFinalizeWithdraw(_withdrawalRequestID);
     }
 
     function isContained(bytes32 merkleRoot, bytes _proof, bytes32 _datahash) public pure returns (bool) {

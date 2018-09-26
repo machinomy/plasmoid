@@ -202,8 +202,7 @@ contract('Plasmoid', accounts => {
       expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx2.logs[1]))
       const withdrawalRequestID = eventArgs2.withdrawalRequestID
 
-      const tx4 = await plasmoid.finalizeWithdraw(withdrawalRequestID)
-      expect(tx4.logs[0]).toBeFalsy()
+      await expect(plasmoid.finalizeWithdraw(withdrawalRequestID)).rejects.toBeTruthy()
     })
 
     test('withdrawal with invalid merkle root', async () => {
