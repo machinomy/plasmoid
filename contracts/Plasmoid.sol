@@ -13,8 +13,9 @@ contract Plasmoid is Ownable {
 
     mapping (uint256 => uint256) private balances;
     mapping (uint256 => address) public owners;
-    mapping (uint256 => bytes32) public checkpoints;
+    mapping (uint256 => Checkpoint) public checkpoints;
     mapping (bytes32 => ExitQueueElement) public exitQueue;
+    mapping (bytes32 => DisputeQueueElement) public disputeQueue;
 
     uint256 public channelIdNow;
     uint256 public checkpointIdNow;
@@ -23,13 +24,24 @@ contract Plasmoid is Ownable {
 
     uint256 public settlingPeriod = 3 days;
 
+    bool halt = false;
+
     event DidDeposit(uint256 indexed channelId, address indexed owner, uint256 amount);
     event DidWithdraw(uint256 indexed channelId, address indexed owner, uint256 amount);
-    event DidStartWithdraw(uint256 indexed checkpointId, uint256 indexed channelId, address indexed owner, uint256 amount);
+    event DidStartWithdraw(uint256 checkpointId, uint256 channelId, uint256 amount, address owner);
     event DidTransfer(uint256 indexed channelId, address indexed owner, address indexed receiver);
     event DidCheckpoint(uint256 indexed checkpointId);
     event DidFinalizeWithdraw(bytes32 indexed withdrawalRequestID);
     event DidAddToExitingQueue(uint256 indexed channelId, uint256 indexed channelAmount, address indexed owner, uint256 checkpointId, uint256 withdrawalRequestMoment, bytes32 withdrawalRequestID);
+    event DidStartDispute(uint256 checkpointId, uint256 channelId, uint256 amount, address owner);
+    event DidAddToDisputeQueue(uint256 indexed channelId, uint256 indexed channelAmount, address indexed owner, uint256 checkpointId, uint256 disputeRequestMoment, bytes32 disputeRequestID);
+    event DidFinalizeDispute(bytes32 disputeRequestID);
+
+    struct Checkpoint {
+        bytes32 stateMerkleRoot;
+        bytes32 acceptanceMerkleRoot;
+        bytes32 ownersMerkleRoot;
+    }
 
     struct ExitQueueElement {
         uint256 channelId;
@@ -39,6 +51,14 @@ contract Plasmoid is Ownable {
         uint256 withdrawalRequestMoment;
     }
 
+    struct DisputeQueueElement {
+        uint256 channelId;
+        uint256 channelAmount;
+        address owner;
+        uint256 checkpointId;
+        uint256 disputeRequestMoment;
+    }
+
     enum SignatureType {
         Caller, // 0x00
         EthSign // 0x01
@@ -46,15 +66,15 @@ contract Plasmoid is Ownable {
 
     constructor (address _tokenAddress) public Ownable() {
         token = StandardToken(_tokenAddress);
-        channelIdNow = 0;
-        checkpointIdNow = 0;
+        channelIdNow = 1;
+        checkpointIdNow = 1;
     }
 
     function balanceOf (uint256 _channelId) public view returns (uint256) {
         return balances[_channelId];
     }
 
-    function setSettlingPeriod (uint256 _settlingPeriod) {
+    function setSettlingPeriod (uint256 _settlingPeriod) public {
         require(_settlingPeriod > 0, "Settling period must be > 0");
         settlingPeriod = _settlingPeriod;
     }
@@ -81,6 +101,10 @@ contract Plasmoid is Ownable {
         return keccak256(abi.encodePacked("t", address(this), _channelId, _receiver));
     }
 
+    function acceptCurrentStateDigest (uint256 _channelId, uint256 _amount, address _owner) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked("acceptCurrentState", _channelId, _amount, _owner));
+    }
+
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {
         uint8 signatureTypeRaw = uint8(_signature.popLastByte());
         SignatureType signatureType = SignatureType(signatureTypeRaw);
@@ -94,10 +118,13 @@ contract Plasmoid is Ownable {
         }
     }
 
-    function checkpoint (bytes32 _merkleRoot, bytes _signature) public {
-        require(isValidSignature(_merkleRoot, owner, _signature), "ONLY_OWNER_CAN_CHECKPOINT");
+    function checkpoint (bytes32 _stateMerkleRoot, bytes32 _acceptanceMerkleRoot, bytes32 _ownersMerkleRoot, bytes _stateSignature, bytes _acceptanceSignature, bytes _ownersSignature) public {
+        require(!halt, 'Halt state. This contract instance can not make checkpoints anymore.');
+        require(isValidSignature(_stateMerkleRoot, owner, _stateSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
+        require(isValidSignature(_acceptanceMerkleRoot, owner, _acceptanceSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
+        require(isValidSignature(_ownersMerkleRoot, owner, _ownersSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
         checkpointIdNow = checkpointIdNow.add(1);
-        checkpoints[checkpointIdNow] = _merkleRoot;
+        checkpoints[checkpointIdNow] = Checkpoint({ stateMerkleRoot: _stateMerkleRoot, acceptanceMerkleRoot: _acceptanceMerkleRoot, ownersMerkleRoot: _ownersMerkleRoot });
 
         emit DidCheckpoint(checkpointIdNow);
     }
@@ -117,7 +144,7 @@ contract Plasmoid is Ownable {
 
     function startWithdraw (uint256 _checkpointId, bytes _merkleProof, uint256 _channelId) public {
         address owner = owners[_channelId];
-        bytes32 merkleRoot = checkpoints[_checkpointId];
+        bytes32 merkleRoot = checkpoints[_checkpointId].stateMerkleRoot;
         uint256 channelAmount = balances[_channelId];
         bytes32 stateDigest = keccak256(abi.encodePacked(_channelId, channelAmount, owner));
 
@@ -126,13 +153,14 @@ contract Plasmoid is Ownable {
         require(isContained(merkleRoot, _merkleProof, stateDigest), "State data is not in Merkle Root");
         addToExitingQueue(owner, channelAmount, _channelId, _checkpointId);
 
-        emit DidStartWithdraw(_checkpointId, _channelId, owner, channelAmount);
+        emit DidStartWithdraw(_checkpointId, _channelId, channelAmount, owner);
     }
 
     function addToExitingQueue (address _owner, uint256 _channelAmount, uint256 _channelId, uint256 _checkpointId) internal {
-        bytes32 _stateDigest = keccak256(abi.encodePacked(_channelId, _channelAmount, _owner));
-        exitQueue[_stateDigest] = ExitQueueElement({ channelId: _channelId, channelAmount: _channelAmount, owner: _owner, checkpointId: _checkpointId, withdrawalRequestMoment: block.timestamp });
-        emit DidAddToExitingQueue(_channelId, _channelAmount, _owner, _checkpointId, exitQueue[_stateDigest].withdrawalRequestMoment, _stateDigest);
+        uint256 timestamp = block.timestamp;
+        bytes32 _stateDigest = keccak256(abi.encodePacked(_channelId, _channelAmount, _owner, timestamp));
+        exitQueue[_stateDigest] = ExitQueueElement({ channelId: _channelId, channelAmount: _channelAmount, owner: _owner, checkpointId: _checkpointId, withdrawalRequestMoment: timestamp });
+        emit DidAddToExitingQueue(_channelId, _channelAmount, _owner, _checkpointId, timestamp, _stateDigest);
     }
 
     function finalizeWithdraw (bytes32 _withdrawalRequestID) public {
@@ -150,6 +178,49 @@ contract Plasmoid is Ownable {
         delete exitQueue[_withdrawalRequestID];
 
         emit DidFinalizeWithdraw(_withdrawalRequestID);
+    }
+
+    // Called by user
+    function startDispute (uint256 _channelId, uint256 _amount, address _owner, bytes _signature, uint256 _checkpointId, bytes _ownersMerkleProof) public {
+        // need to keccak all params here!
+        bytes32 inputHash = keccak256(abi.encodePacked(_channelId, _amount, _owner));
+        require(isValidSignature(inputHash, _owner, _signature), "ONLY_OWNER_CAN_DISPUTE");
+        bytes32 ownersMerkleRoot = checkpoints[_checkpointId].ownersMerkleRoot;
+        require(isContained(ownersMerkleRoot, _ownersMerkleProof, keccak256(abi.encodePacked(_owner))), "Owner is not in owners merkle root");
+        addToDisputeQueue(_owner, _amount, _channelId, _checkpointId);
+
+        emit DidStartDispute(_checkpointId, _channelId, _amount, _owner);
+    }
+
+    function addToDisputeQueue (address _owner, uint256 _channelAmount, uint256 _channelId, uint256 _checkpointId) internal {
+        uint256 timestamp = block.timestamp;
+        bytes32 _stateDigest = keccak256(abi.encodePacked(_channelId, _channelAmount, _owner, timestamp));
+        disputeQueue[_stateDigest] = DisputeQueueElement({ channelId: _channelId, channelAmount: _channelAmount, owner: _owner, checkpointId: _checkpointId, disputeRequestMoment: timestamp });
+
+        emit DidAddToDisputeQueue(_channelId, _channelAmount, _owner, _checkpointId, timestamp, _stateDigest);
+    }
+
+    function answerDispute (bytes32 _disputeRequestID, bytes _acceptanceMerkleProof) public {
+        uint256 channelId = disputeQueue[_disputeRequestID].channelId;
+        uint256 channelAmount = disputeQueue[_disputeRequestID].channelAmount;
+        address owner = disputeQueue[_disputeRequestID].owner;
+        uint256 checkpointId = disputeQueue[_disputeRequestID].checkpointId;
+
+        bytes32 acceptanceHash = acceptCurrentStateDigest(channelId, channelAmount, owner);
+        bytes32 acceptanceMerkleRoot = checkpoints[checkpointId].acceptanceMerkleRoot;
+
+        require(isContained(acceptanceMerkleRoot, _acceptanceMerkleProof, acceptanceHash), "Acceptance hash is not in merkle root");
+
+        delete disputeQueue[_disputeRequestID];
+    }
+
+    function finalizeDispute (bytes32 _disputeRequestID) public {
+        require(disputeQueue[_disputeRequestID].owner != 0, 'Dispute element does not exists');
+        uint256 _disputeRequestMoment = disputeQueue[_disputeRequestID].disputeRequestMoment;
+        require(_disputeRequestMoment + settlingPeriod < block.timestamp);
+        halt = true;
+
+        emit DidFinalizeDispute(_disputeRequestID);
     }
 
     function isContained(bytes32 merkleRoot, bytes _proof, bytes32 _datahash) public pure returns (bool) {

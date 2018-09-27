@@ -1,4 +1,4 @@
-const GAS_LIMIT = 2700000
+const GAS_LIMIT = 3741592
 
 module.exports = {
   networks: {

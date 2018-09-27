@@ -49,6 +49,14 @@ function makeStateDigest (user: string): Buffer {
   return digest
 }
 
+function makeAcceptanceDigest (user: string): Buffer {
+  // console.log(`makeAcceptanceDigest: ${user}`)
+  let state: PlasmaState = accountsState.get(user)!
+  // console.log(JSON.stringify(accountsState))
+  const digest = util.sha3(Buffer.concat([Buffer.from('acceptCurrentState'), state.toBuffer()]))
+  return digest
+}
+
 async function sign (address: string, data: string): Promise<string> {
   let result = await web3.eth.sign(address, data)
   result += '01'
@@ -109,18 +117,50 @@ contract('Plasmoid', accounts => {
       accountHashesArray.push(digest11)
       accountHashesArray.push(digest12)
 
-      let tree = new MerkleTree(accountHashesArray)
-      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
-
-      const signature = await sign(PLASMOID_OWNER, merkleRoot)
-      const recoveredAddress = recover(signature, merkleRoot)
-
       await plasmoid.setSettlingPeriod(1)
 
+      let stateTree = new MerkleTree(accountHashesArray)
+      const stateMerkleRoot: string = util.addHexPrefix(stateTree.root.toString('hex'))
+
+      // START User-side ALICE
+      let acceptanceDigestAlice: string = util.addHexPrefix(makeAcceptanceDigest(ALICE).toString('hex'))
+      let acceptanceDigestFromBlockchainAlice = await plasmoid.acceptCurrentStateDigest(accountsState.get(ALICE)!.channelId, accountsState.get(ALICE)!.amount, accountsState.get(ALICE)!.owner)
+      expect(acceptanceDigestFromBlockchainAlice).toEqual(acceptanceDigestAlice)
+      let acceptanceSignatureAlice = await sign(ALICE, acceptanceDigestAlice)
+      // END User-side ALICE
+
+      // START User-side BOB
+      let acceptanceDigestBob: string = util.addHexPrefix(makeAcceptanceDigest(BOB).toString('hex'))
+      let acceptanceDigestFromBlockchainBob = await plasmoid.acceptCurrentStateDigest(accountsState.get(BOB)!.channelId, accountsState.get(BOB)!.amount, accountsState.get(BOB)!.owner)
+      expect(acceptanceDigestFromBlockchainBob).toEqual(acceptanceDigestBob)
+      let acceptanceSignatureBob = await sign(BOB, acceptanceDigestBob)
+      // END User-side BOB
+
+      let acceptanceTree = new MerkleTree([util.sha3(acceptanceSignatureAlice), util.sha3(acceptanceSignatureBob)])
+      const acceptanceMerkleRoot: string = util.addHexPrefix(acceptanceTree.root.toString('hex'))
+
+      let ownersTree = new MerkleTree([util.sha3(ALICE), util.sha3(BOB)])
+      const ownersMerkleRoot = util.addHexPrefix(ownersTree.root.toString('hex'))
+
+      // START Person that makes a checkpoint side
+      let stateSignatureCheckpointer = await sign(PLASMOID_OWNER, stateMerkleRoot)
+      let acceptanceSignatureCheckpointer = await sign(PLASMOID_OWNER, acceptanceMerkleRoot)
+      let ownersSignatureCheckpointer = await sign(PLASMOID_OWNER, ownersMerkleRoot)
+      // const recoveredAddress = recover(signature, statMerkleRoot)
+
       // Do the first checkpoint
-      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+      const tx = await plasmoid.checkpoint(stateMerkleRoot, acceptanceMerkleRoot, ownersMerkleRoot, stateSignatureCheckpointer, acceptanceSignatureCheckpointer, ownersSignatureCheckpointer, { from: PLASMOID_OWNER })
+      console.log(JSON.stringify(tx.logs))
       const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
       const checkpointUid = eventArgs.checkpointId as BigNumber
+      // END Person that makes a checkpoint side
+
+
+
+
+
+
+
 
       accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
       accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
@@ -131,19 +171,49 @@ contract('Plasmoid', accounts => {
       accountHashesArray.push(digest21)
       accountHashesArray.push(digest22)
 
-      tree = new MerkleTree(accountHashesArray)
-      const merkleRoot2: string = util.addHexPrefix(tree.root.toString('hex'))
+      stateTree = new MerkleTree(accountHashesArray)
+      const stateMerkleRoot2: string = util.addHexPrefix(stateTree.root.toString('hex'))
 
-      const merkleProof2: Buffer[] = tree.proof(digest22)
-      const signature2 = await sign(PLASMOID_OWNER, merkleRoot2)
+      // const merkleProof2: Buffer[] = stateTree.proof(digest22)
+
+      // START User-side ALICE
+      acceptanceDigestAlice = util.addHexPrefix(makeAcceptanceDigest(ALICE).toString('hex'))
+      acceptanceDigestFromBlockchainAlice = await plasmoid.acceptCurrentStateDigest(accountsState.get(ALICE)!.channelId, accountsState.get(ALICE)!.amount, accountsState.get(ALICE)!.owner)
+      expect(acceptanceDigestFromBlockchainAlice).toEqual(acceptanceDigestAlice)
+      acceptanceSignatureAlice = await sign(ALICE, acceptanceDigestAlice)
+      // END User-side ALICE
+
+      // START User-side BOB
+      acceptanceDigestBob = util.addHexPrefix(makeAcceptanceDigest(BOB).toString('hex'))
+      acceptanceDigestFromBlockchainBob = await plasmoid.acceptCurrentStateDigest(accountsState.get(BOB)!.channelId, accountsState.get(BOB)!.amount, accountsState.get(BOB)!.owner)
+      expect(acceptanceDigestFromBlockchainBob).toEqual(acceptanceDigestBob)
+      acceptanceSignatureBob = await sign(BOB, acceptanceDigestBob)
+      // END User-side BOB
+
+      acceptanceTree = new MerkleTree([util.sha3(acceptanceSignatureAlice), util.sha3(acceptanceSignatureBob)])
+      const acceptanceMerkleRoot2 = util.addHexPrefix(acceptanceTree.root.toString('hex'))
+
+      ownersTree = new MerkleTree([util.sha3(ALICE), util.sha3(BOB)])
+      const ownersMerkleRoot2 = util.addHexPrefix(ownersTree.root.toString('hex'))
+
+      // START Person that makes a checkpoint side
+      stateSignatureCheckpointer = await sign(PLASMOID_OWNER, stateMerkleRoot2)
+      acceptanceSignatureCheckpointer = await sign(PLASMOID_OWNER, acceptanceMerkleRoot2)
+      ownersSignatureCheckpointer = await sign(PLASMOID_OWNER, ownersMerkleRoot2)
+      // const recoveredAddress = recover(signature, statMerkleRoot)
 
       // Do the second checkpoint
-      const tx2 = await plasmoid.checkpoint(merkleRoot2, signature2, { from: PLASMOID_OWNER })
-      const eventArgs2: PlasmoidWrapper.DidCheckpoint = tx2.logs[0].args
-      const checkpointUid2 = eventArgs2.checkpointId as BigNumber
+      const tx21 = await plasmoid.checkpoint(stateMerkleRoot2, acceptanceMerkleRoot2, ownersMerkleRoot2, stateSignatureCheckpointer, acceptanceSignatureCheckpointer, ownersSignatureCheckpointer,{ from: PLASMOID_OWNER })
+      const eventArgs21: PlasmoidWrapper.DidCheckpoint = tx21.logs[0].args
+      const checkpointUid21 = eventArgs21.checkpointId as BigNumber
+      // END Person that makes a checkpoint side
 
-      const concat: Buffer = Buffer.concat(merkleProof2)
-      const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
+      // const concat: Buffer = Buffer.concat(merkleProof2)
+      const concatenatedProofAsString: string = util.addHexPrefix(Buffer.concat(stateTree.proof(digest22)).toString('hex'))
+
+
+
+      // console.log(`Verify = ${stateTree.verify(stateTree.proof(digest22), digest22)}`)
 
       // Do transfer ownership of channel from ALICE to BOB
       const transferDigest = await plasmoid.transferDigest(channelId, BOB)
@@ -151,12 +221,16 @@ contract('Plasmoid', accounts => {
       await plasmoid.transfer(channelId, BOB, transferSignature)
 
       // Do withdrawal with checkpoint
-      const tx3 = await plasmoid.startWithdraw(checkpointUid2, concatenatedProofAsString, channelId, { from: BOB })
+      const tx3 = await plasmoid.startWithdraw(checkpointUid21, concatenatedProofAsString, channelId, { from: BOB })
+      PlasmoidWrapper.printEvents(tx3)
+      console.log(`stateMerkleRoot2 = ${stateMerkleRoot2}`)
+      //
       const eventArgs3: PlasmoidWrapper.DidAddToExitingQueue = tx3.logs[0].args
-      expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx3.logs[0]))
-      expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx3.logs[1]))
-      const withdrawalRequestID = eventArgs3.withdrawalRequestID
 
+      // expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx3.logs[0]))
+      // expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx3.logs[1]))
+      const withdrawalRequestID = eventArgs3.withdrawalRequestID
+      console.log(`withdrawalRequestID : ${withdrawalRequestID}`)
       // Some delay for time increasing
       setTimeout(async () => {
         const tx4 = await plasmoid.finalizeWithdraw(withdrawalRequestID)
@@ -165,84 +239,131 @@ contract('Plasmoid', accounts => {
       }, 2500)
     })
 
-    test('withdraw in settling period', async () => {
-      let accountHashesArray: Buffer[] = []
+    // Handle case when owner in not in state merkle root
 
-      let tree = new MerkleTree(accountHashesArray)
+    // test('withdraw in settling period', async () => {
+    //   let accountHashesArray: Buffer[] = []
+    //
+    //   let tree = new MerkleTree(accountHashesArray)
+    //
+    //   accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
+    //   accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
+    //
+    //   accountHashesArray = []
+    //   const digest21: Buffer = makeStateDigest(ALICE)
+    //   const digest22: Buffer = makeStateDigest(BOB)
+    //   accountHashesArray.push(digest21)
+    //   accountHashesArray.push(digest22)
+    //
+    //   tree = new MerkleTree(accountHashesArray)
+    //   const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
+    //
+    //   const merkleProof: Buffer[] = tree.proof(digest22)
+    //   const signature = await sign(PLASMOID_OWNER, merkleRoot)
+    //
+    //   const tx1 = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+    //   const eventArgs: PlasmoidWrapper.DidCheckpoint = tx1.logs[0].args
+    //   const checkpointUid = eventArgs.checkpointId as BigNumber
+    //
+    //   const concat: Buffer = Buffer.concat(merkleProof)
+    //   const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
+    //
+    //   const transferDigest = await plasmoid.transferDigest(channelId, BOB)
+    //   const transferSignature = await sign(ALICE, transferDigest)
+    //   await plasmoid.transfer(channelId, BOB, transferSignature)
+    //
+    //   const tx2 = await plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })
+    //   const eventArgs2: PlasmoidWrapper.DidAddToExitingQueue = tx2.logs[0].args
+    //   expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx2.logs[0]))
+    //   expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx2.logs[1]))
+    //   const withdrawalRequestID = eventArgs2.withdrawalRequestID
+    //
+    //   await expect(plasmoid.finalizeWithdraw(withdrawalRequestID)).rejects.toBeTruthy()
+    // })
 
-      accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
-      accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
-
-      accountHashesArray = []
-      const digest21: Buffer = makeStateDigest(ALICE)
-      const digest22: Buffer = makeStateDigest(BOB)
-      accountHashesArray.push(digest21)
-      accountHashesArray.push(digest22)
-
-      tree = new MerkleTree(accountHashesArray)
-      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
-
-      const merkleProof: Buffer[] = tree.proof(digest22)
-      const signature = await sign(PLASMOID_OWNER, merkleRoot)
-
-      const tx1 = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
-      const eventArgs: PlasmoidWrapper.DidCheckpoint = tx1.logs[0].args
-      const checkpointUid = eventArgs.checkpointId as BigNumber
-
-      const concat: Buffer = Buffer.concat(merkleProof)
-      const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
-
-      const transferDigest = await plasmoid.transferDigest(channelId, BOB)
-      const transferSignature = await sign(ALICE, transferDigest)
-      await plasmoid.transfer(channelId, BOB, transferSignature)
-
-      const tx2 = await plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })
-      const eventArgs2: PlasmoidWrapper.DidAddToExitingQueue = tx2.logs[0].args
-      expect(PlasmoidWrapper.isDidAddToExitingQueueEvent(tx2.logs[0]))
-      expect(PlasmoidWrapper.isDidStartWithdrawEvent(tx2.logs[1]))
-      const withdrawalRequestID = eventArgs2.withdrawalRequestID
-
-      await expect(plasmoid.finalizeWithdraw(withdrawalRequestID)).rejects.toBeTruthy()
-    })
-
-    test('withdrawal with invalid merkle root', async () => {
-      let accountHashesArray: Buffer[] = []
-
-      let tree = new MerkleTree(accountHashesArray)
-
-      accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
-      accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
-
-      accountHashesArray = []
-      const digest21: Buffer = makeStateDigest(ALICE)
-      const digest22: Buffer = makeStateDigest(BOB)
-      accountHashesArray.push(digest21)
-      accountHashesArray.push(digest22)
-
-      tree = new MerkleTree(accountHashesArray)
-      // Reverse string
-      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex').split('').reverse().join(''))
-
-      const merkleProof: Buffer[] = tree.proof(digest22)
-      const signature = await sign(PLASMOID_OWNER, merkleRoot)
-
-      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
-      const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-      const checkpointUid = eventArgs.checkpointId as BigNumber
-
-      const concat: Buffer = Buffer.concat(merkleProof)
-      const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
-
-      const transferDigest = await plasmoid.transferDigest(channelId, BOB)
-      const transferSignature = await sign(ALICE, transferDigest)
-      const transferTx = await plasmoid.transfer(channelId, BOB, transferSignature)
-      const eventTransferArgs: PlasmoidWrapper.DidTransfer = transferTx.logs[0].args
-
-      await expect(plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })).rejects.toBeTruthy()
-    })
+  //   test('withdrawal with invalid merkle root', async () => {
+  //     let accountHashesArray: Buffer[] = []
+  //
+  //     let tree = new MerkleTree(accountHashesArray)
+  //
+  //     accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(0), ALICE))
+  //     accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(100), BOB))
+  //
+  //     accountHashesArray = []
+  //     const digest21: Buffer = makeStateDigest(ALICE)
+  //     const digest22: Buffer = makeStateDigest(BOB)
+  //     accountHashesArray.push(digest21)
+  //     accountHashesArray.push(digest22)
+  //
+  //     tree = new MerkleTree(accountHashesArray)
+  //     // Reverse string
+  //     const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex').split('').reverse().join(''))
+  //
+  //     const merkleProof: Buffer[] = tree.proof(digest22)
+  //     const signature = await sign(PLASMOID_OWNER, merkleRoot)
+  //
+  //     const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+  //     const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
+  //     const checkpointUid = eventArgs.checkpointId as BigNumber
+  //
+  //     const concat: Buffer = Buffer.concat(merkleProof)
+  //     const concatenatedProofAsString: string = util.addHexPrefix(concat.toString('hex'))
+  //
+  //     const transferDigest = await plasmoid.transferDigest(channelId, BOB)
+  //     const transferSignature = await sign(ALICE, transferDigest)
+  //     const transferTx = await plasmoid.transfer(channelId, BOB, transferSignature)
+  //     const eventTransferArgs: PlasmoidWrapper.DidTransfer = transferTx.logs[0].args
+  //
+  //     await expect(plasmoid.startWithdraw(checkpointUid, concatenatedProofAsString, channelId, { from: BOB })).rejects.toBeTruthy()
+  //   })
   })
 
-  describe('checkpoint', () => {
+  // describe('checkpoint', () => {
+  //   let channelId: BigNumber
+  //
+  //   beforeEach(async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+  //     channelId = eventArgs.channelId as BigNumber
+  //     accountsState.clear()
+  //     accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(100), ALICE))
+  //     accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(0), BOB))
+  //   })
+  //
+  //   test('Checkpoint', async () => {
+  //     let accountHashesArray: Buffer[] = []
+  //
+  //     accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(90), ALICE))
+  //     accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(10), BOB))
+  //
+  //     const digest11: Buffer = makeStateDigest(ALICE)
+  //     const digest12: Buffer = makeStateDigest(BOB)
+  //     accountHashesArray.push(digest11)
+  //     accountHashesArray.push(digest12)
+  //
+  //     let tree = new MerkleTree(accountHashesArray)
+  //     const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
+  //
+  //     const signature = await sign(PLASMOID_OWNER, merkleRoot)
+  //
+  //     const checkpointIdBefore: BigNumber = await plasmoid.checkpointIdNow()
+  //     const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+  //     const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
+  //     const checkpointIdAfter: BigNumber = await plasmoid.checkpointIdNow()
+  //     expect(checkpointIdAfter.toNumber()).toBeGreaterThan(checkpointIdBefore.toNumber())
+  //   })
+  //
+  //   test('Invalid checkpoint\'s signature', async () => {
+  //     const merkleRoot: string = '0xcafe'
+  //
+  //     const signature = await sign(ALICE, merkleRoot)
+  //
+  //     await expect(plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })).rejects.toBeTruthy()
+  //   })
+  // })
+
+  describe('Dispute', () => {
     let channelId: BigNumber
 
     beforeEach(async () => {
@@ -250,12 +371,13 @@ contract('Plasmoid', accounts => {
       const tx = await plasmoid.deposit(VALUE, { from: ALICE })
       const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
       channelId = eventArgs.channelId as BigNumber
+
       accountsState.clear()
       accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(100), ALICE))
       accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(0), BOB))
     })
 
-    test('Checkpoint', async () => {
+    test('User did taking a part in checkpoint and operator put not valid digest', async (done) => {
       let accountHashesArray: Buffer[] = []
 
       accountsState.set(ALICE, new PlasmaState(channelId, new BigNumber(90), ALICE))
@@ -266,24 +388,79 @@ contract('Plasmoid', accounts => {
       accountHashesArray.push(digest11)
       accountHashesArray.push(digest12)
 
-      let tree = new MerkleTree(accountHashesArray)
-      const merkleRoot: string = util.addHexPrefix(tree.root.toString('hex'))
+      await plasmoid.setSettlingPeriod(1)
 
-      const signature = await sign(PLASMOID_OWNER, merkleRoot)
+      let stateTree = new MerkleTree(accountHashesArray)
+      const stateMerkleRoot: string = util.addHexPrefix(stateTree.root.toString('hex'))
 
-      const checkpointIdBefore: BigNumber = await plasmoid.checkpointIdNow()
-      const tx = await plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })
+      // START User-side ALICE
+      let acceptanceDigestAlice: string = util.addHexPrefix(makeAcceptanceDigest(ALICE).toString('hex'))
+      let acceptanceDigestFromBlockchainAlice = await plasmoid.acceptCurrentStateDigest(accountsState.get(ALICE)!.channelId, accountsState.get(ALICE)!.amount, accountsState.get(ALICE)!.owner)
+      expect(acceptanceDigestFromBlockchainAlice).toEqual(acceptanceDigestAlice)
+      let acceptanceSignatureAlice = await sign(ALICE, acceptanceDigestAlice)
+      // END User-side ALICE
+
+      // START User-side BOB
+      let acceptanceDigestBob: string = util.addHexPrefix(makeAcceptanceDigest(BOB).toString('hex'))
+      let acceptanceDigestFromBlockchainBob = await plasmoid.acceptCurrentStateDigest(accountsState.get(BOB)!.channelId, accountsState.get(BOB)!.amount, accountsState.get(BOB)!.owner)
+      expect(acceptanceDigestFromBlockchainBob).toEqual(acceptanceDigestBob)
+      let acceptanceSignatureBob = await sign(BOB, acceptanceDigestBob)
+      // END User-side BOB
+
+      let acceptanceTree = new MerkleTree([util.sha3(acceptanceSignatureAlice), util.sha3(acceptanceSignatureBob)])
+      const acceptanceMerkleRoot: string = util.addHexPrefix(acceptanceTree.root.toString('hex'))
+
+      let ownersTree = new MerkleTree([util.sha3(ALICE), util.sha3(BOB)])
+      const ownersMerkleRoot = util.addHexPrefix(ownersTree.root.toString('hex'))
+
+      // START Person that makes a checkpoint side
+      let stateSignatureCheckpointer = await sign(PLASMOID_OWNER, stateMerkleRoot)
+      let acceptanceSignatureCheckpointer = await sign(PLASMOID_OWNER, acceptanceMerkleRoot)
+      let ownersSignatureCheckpointer = await sign(PLASMOID_OWNER, ownersMerkleRoot)
+      // const recoveredAddress = recover(signature, statMerkleRoot)
+
+      // Do the first checkpoint
+      const tx = await plasmoid.checkpoint(stateMerkleRoot, acceptanceMerkleRoot, ownersMerkleRoot, stateSignatureCheckpointer, acceptanceSignatureCheckpointer, ownersSignatureCheckpointer, { from: PLASMOID_OWNER })
+      console.log(JSON.stringify(tx.logs))
       const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-      const checkpointIdAfter: BigNumber = await plasmoid.checkpointIdNow()
-      expect(checkpointIdAfter.toNumber()).toBeGreaterThan(checkpointIdBefore.toNumber())
-    })
+      const checkpointUid = eventArgs.checkpointId as BigNumber
+      // END Person that makes a checkpoint side
 
-    test('Invalid checkpoint\'s signature', async () => {
-      const merkleRoot: string = '0xcafe'
+      // const concat: Buffer = Buffer.concat(merkleProof2)
+      // const concatenatedProofAsString: string = util.addHexPrefix(Buffer.concat(stateTree.proof(digest22)).toString('hex'))
 
-      const signature = await sign(ALICE, merkleRoot)
+      // Do transfer ownership of channel from ALICE to BOB
+      const transferDigest = await plasmoid.transferDigest(channelId, BOB)
+      const transferSignature = await sign(ALICE, transferDigest)
+      await plasmoid.transfer(channelId, BOB, transferSignature)
 
-      await expect(plasmoid.checkpoint(merkleRoot, signature, { from: PLASMOID_OWNER })).rejects.toBeTruthy()
+
+      // Data Signature is Buffer.from channelId, amount, owner, checkpointId
+      // const dataDigest = Buffer.concat([accountsState.get(BOB)!.toBuffer(), util.setLengthLeft((util.toBuffer(numberToBN(checkpointUid))), 32)]).toString('hex')
+      const dataDigest = util.addHexPrefix(util.sha3(accountsState.get(BOB)!.toBuffer()).toString('hex'))
+      const dataSignature = await sign(BOB, dataDigest)
+      const dataSignatureAsString = util.addHexPrefix(dataSignature)
+      const concatenatedOwnersProofAsString2: string = util.addHexPrefix(Buffer.concat(ownersTree.proof(util.sha3(BOB))).toString('hex'))
+
+      const proposedChannelID: BigNumber = new BigNumber(accountsState.get(BOB)!.channelId)
+      console.log(`proposedChannelID = ${proposedChannelID.toString()}`)
+      const proposedAmount: BigNumber = new BigNumber(accountsState.get(BOB)!.amount)
+      console.log(`proposedAmount = ${proposedAmount.toString()}`)
+      const proposedOwner: string = accountsState.get(BOB)!.owner
+      console.log(`proposedOwner = ${proposedOwner}`)
+      console.log(`dataSignatureAsString = ${dataSignatureAsString}`)
+      console.log(`checkpointUid = ${checkpointUid.toString()}`)
+      console.log(`concatenatedOwnersProofAsString2 = ${concatenatedOwnersProofAsString2}`)
+      console.log(`dataDigest = ${dataDigest}`)
+      const tx3 = await plasmoid.startDispute(proposedChannelID, proposedAmount, proposedOwner, dataSignatureAsString, checkpointUid, concatenatedOwnersProofAsString2)
+      PlasmoidWrapper.printEvents(tx3)
+      const eventArgsAddToDispute: PlasmoidWrapper.DidAddToDisputeQueue = tx3.logs[0].args
+
+      setTimeout(async () => {
+        const tx4 = await plasmoid.finalizeDispute(eventArgsAddToDispute.disputeRequestID)
+        expect(tx4.logs[0] && PlasmoidWrapper.isDidFinalizeDisputeEvent(tx4.logs[0])).toBeTruthy()
+        done()
+      }, 2500)
     })
   })
 
