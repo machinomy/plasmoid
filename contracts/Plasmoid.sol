@@ -39,8 +39,9 @@ contract Plasmoid is Ownable {
 
     struct Checkpoint {
         bytes32 stateMerkleRoot;
-        bytes32 acceptanceMerkleRoot;
+        bytes32 stateAcceptanceMerkleRoot;
         bytes32 ownersMerkleRoot;
+        bytes32 ownersAcceptanceMerkleRoot;
     }
 
     struct ExitQueueElement {
@@ -105,6 +106,10 @@ contract Plasmoid is Ownable {
         return keccak256(abi.encodePacked("acceptCurrentState", _channelId, _amount, _owner));
     }
 
+    function acceptCurrentOwnersStateDigest (uint256 _checkpointId, bytes32 _ownersMerkleRoot) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked("acceptCurrentOwnersState", _checkpointId, _ownersMerkleRoot));
+    }
+
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {
         uint8 signatureTypeRaw = uint8(_signature.popLastByte());
         SignatureType signatureType = SignatureType(signatureTypeRaw);
@@ -118,13 +123,18 @@ contract Plasmoid is Ownable {
         }
     }
 
-    function checkpoint (bytes32 _stateMerkleRoot, bytes32 _acceptanceMerkleRoot, bytes32 _ownersMerkleRoot, bytes _stateSignature, bytes _acceptanceSignature, bytes _ownersSignature) public {
+    function checkpoint (bytes32 _stateMerkleRoot, bytes32 _stateAcceptanceMerkleRoot, bytes32 _ownersMerkleRoot, bytes32 _ownersAcceptanceMerkleRoot, bytes _stateSignature, bytes _stateAcceptanceSignature, bytes _ownersSignature, bytes _ownersAcceptanceSignature) public {
         require(!halt, 'Halt state. This contract instance can not make checkpoints anymore.');
         require(isValidSignature(_stateMerkleRoot, owner, _stateSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
-        require(isValidSignature(_acceptanceMerkleRoot, owner, _acceptanceSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
+        require(isValidSignature(_stateAcceptanceMerkleRoot, owner, _stateAcceptanceSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
         require(isValidSignature(_ownersMerkleRoot, owner, _ownersSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
+        require(isValidSignature(_ownersAcceptanceMerkleRoot, owner, _ownersAcceptanceSignature), "ONLY_PLASMOID_OWNER_CAN_CHECKPOINT");
         checkpointIdNow = checkpointIdNow.add(1);
-        checkpoints[checkpointIdNow] = Checkpoint({ stateMerkleRoot: _stateMerkleRoot, acceptanceMerkleRoot: _acceptanceMerkleRoot, ownersMerkleRoot: _ownersMerkleRoot });
+        checkpoints[checkpointIdNow] = Checkpoint({ stateMerkleRoot: _stateMerkleRoot,
+                                                    stateAcceptanceMerkleRoot: _stateAcceptanceMerkleRoot,
+                                                    ownersMerkleRoot: _ownersMerkleRoot,
+                                                    ownersAcceptanceMerkleRoot: _ownersAcceptanceMerkleRoot
+                                                    });
 
         emit DidCheckpoint(checkpointIdNow);
     }
@@ -183,7 +193,7 @@ contract Plasmoid is Ownable {
     // Called by user
     function startDispute (uint256 _channelId, uint256 _amount, address _owner, bytes _signature, uint256 _checkpointId, bytes _ownersMerkleProof) public {
         // need to keccak all params here!
-        bytes32 inputHash = keccak256(abi.encodePacked(_channelId, _amount, _owner));
+        bytes32 inputHash = keccak256(abi.encodePacked(_channelId, _amount, _owner, _checkpointId));
         require(isValidSignature(inputHash, _owner, _signature), "ONLY_OWNER_CAN_DISPUTE");
         bytes32 ownersMerkleRoot = checkpoints[_checkpointId].ownersMerkleRoot;
         require(isContained(ownersMerkleRoot, _ownersMerkleProof, keccak256(abi.encodePacked(_owner))), "Owner is not in owners merkle root");
@@ -207,7 +217,7 @@ contract Plasmoid is Ownable {
         uint256 checkpointId = disputeQueue[_disputeRequestID].checkpointId;
 
         bytes32 acceptanceHash = acceptCurrentStateDigest(channelId, channelAmount, owner);
-        bytes32 acceptanceMerkleRoot = checkpoints[checkpointId].acceptanceMerkleRoot;
+        bytes32 acceptanceMerkleRoot = checkpoints[checkpointId].stateAcceptanceMerkleRoot;
 
         require(isContained(acceptanceMerkleRoot, _acceptanceMerkleProof, acceptanceHash), "Acceptance hash is not in merkle root");
 
