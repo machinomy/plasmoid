@@ -7,11 +7,11 @@ import MerkleTree from './MerkleTree'
 import { Buffer } from 'safe-buffer'
 import Logger from '@machinomy/logger'
 import * as Web3  from 'web3'
-import * as truffle from 'truffle-contract'
+import { PlasmaState } from './PlasmaState'
+import { Participant } from './Participant'
+import { AccountService } from './AccountService'
+import * as solUtils from './SolidityUtils'
 
-const numberToBN = require('number-to-bn')
-const ethSigUtil = require('eth-sig-util')
-require('console.table')
 
 const Plasmoid = artifacts.require<contracts.Plasmoid.Contract>('Plasmoid.sol')
 const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
@@ -24,263 +24,6 @@ const LOG = new Logger('plasmoid')
 const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
 
 let accountsState: Map<string, PlasmaState> = new Map()
-
-export class PlasmaState {
-  channelId: BigNumber
-  amount: BigNumber
-  owner: string
-
-  constructor (channelId: BigNumber | undefined, amount: BigNumber | undefined, owner: string | undefined) {
-    this.channelId = channelId ? channelId : new BigNumber(-1)
-    this.amount = amount ? amount : new BigNumber(-1)
-    this.owner = owner ? owner : ''
-  }
-
-  toBuffer (): Buffer {
-    const channelIdBuffer = util.setLengthLeft(util.toBuffer(numberToBN(this.channelId)), 32)
-    const amountBuffer = util.setLengthLeft((util.toBuffer(numberToBN(this.amount))), 32)
-    const ownerBuffer = util.toBuffer(this.owner)
-    return Buffer.concat([channelIdBuffer, amountBuffer, ownerBuffer])
-  }
-}
-
-export class Participant {
-  address: string
-  plasmoidContract: contracts.Plasmoid.Contract
-  plasmaState: PlasmaState
-  accountingService: AccountingService
-
-  constructor (address: string, plasmoidContract: contracts.Plasmoid.Contract, accountingService: AccountingService, channelId?: BigNumber, amount?: BigNumber) {
-    this.address = address
-    this.plasmoidContract = plasmoidContract
-    this.plasmaState = new PlasmaState(channelId, amount, address)
-    this.accountingService = accountingService
-  }
-
-  setChannel (channelId: BigNumber) {
-    this.plasmaState.channelId = channelId
-  }
-
-  setAmount (amount: BigNumber) {
-    this.plasmaState.amount = amount
-  }
-
-  setOwner (owner: string) {
-    this.plasmaState.owner = owner
-  }
-
-  async sign (address: string, data: string): Promise<string> {
-    let result = await web3.eth.sign(address, data)
-    result += '01'
-    return result
-  }
-
-  recover (signature: string, data: any): string {
-    signature = signature.slice(0, -2)
-    const result = ethSigUtil.recoverPersonalSignature({ sig: signature, data: data})
-    return result
-  }
-
-  makeStateDigest (): Buffer {
-    const digest = util.sha3(this.plasmaState.toBuffer())
-    return digest
-  }
-
-  async makeAcceptanceSignature (): Promise<string> {
-    const digest = util.sha3(Buffer.concat([Buffer.from('acceptCurrentState'), this.plasmaState.toBuffer()]))
-    const acceptanceDigestUser: string = util.addHexPrefix(digest.toString('hex'))
-    const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(this.plasmaState.channelId, this.plasmaState.amount, this.plasmaState.owner)
-    if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-      throw Error('acceptance digests dont equals!')
-    }
-    const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
-
-    return acceptanceSignature
-  }
-
-  async makeOwnersAcceptanceSignature (checkpointId: BigNumber, ownersMerkleRoot: string): Promise<string> {
-
-    const digest = util.sha3(Buffer.concat([Buffer.from('acceptCurrentOwnersState'), castBignumberToUint256(checkpointId), util.toBuffer(ownersMerkleRoot) ]))
-    const acceptanceDigestUser: string = util.addHexPrefix(digest.toString('hex'))
-    const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentOwnersStateDigest(checkpointId, ownersMerkleRoot)
-    if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-      throw Error('owners acceptance digests dont equals!')
-    }
-    const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
-
-    return acceptanceSignature
-  }
-
-  async makeCheckpoint (): Promise<truffle.TransactionResult> {
-    await this.accountingService.updateTrees()
-
-    const stateTreeRoot = this.accountingService.stateTreeRoot()
-    const stateAcceptanceTreeRoot = this.accountingService.stateAcceptanceTreeRoot()
-    const ownersTreeRoot = this.accountingService.ownersTreeRoot()
-    const ownersAcceptanceTreeRoot = this.accountingService.ownersAcceptanceTreeRoot()
-
-    const stateSignature = await sign(this.address, stateTreeRoot)
-    const stateAcceptanceSignature = await sign(this.address, stateAcceptanceTreeRoot)
-    const ownersSignature = await sign(this.address, ownersTreeRoot)
-    const ownersAcceptanceSignature = await sign(this.address, ownersAcceptanceTreeRoot)
-
-    const tx = await this.plasmoidContract.checkpoint(
-      stateTreeRoot,
-      stateAcceptanceTreeRoot,
-      ownersTreeRoot,
-      ownersAcceptanceTreeRoot,
-      stateSignature,
-      stateAcceptanceSignature,
-      ownersSignature,
-      ownersAcceptanceSignature,
-      { from: this.address })
-
-    const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-    const checkpointUid: BigNumber = eventArgs.checkpointId as BigNumber
-    const checkpointObj = new Checkpoint(checkpointUid, stateTreeRoot, stateAcceptanceTreeRoot, ownersTreeRoot, ownersAcceptanceTreeRoot)
-    this.accountingService.addCheckpoint(checkpointObj)
-    return tx
-  }
-
-  async transfer (channelId: BigNumber, addressA: string, addressB: string): Promise<truffle.TransactionResult> {
-    const transferDigest = await this.plasmoidContract.transferDigest(channelId, addressB)
-    const transferSignature = await this.sign(addressA, transferDigest)
-    const tx = await this.plasmoidContract.transfer(channelId, addressB, transferSignature)
-    return tx
-  }
-
-  async startDispute (channelId: BigNumber, amount: BigNumber, checkpointId: BigNumber): Promise<truffle.TransactionResult> {
-    await this.accountingService.updateTrees()
-    // !!!! FIXME Data Signature is Buffer.from channelId, amount, owner, checkpointId
-    // const channelIdAsBuffer = util.toBuffer(numberToBN(channelId))
-    // const channelIdAsBuffer = util.toBuffer(numberToBN(channelId))
-    const dataDigest = util.addHexPrefix(util.sha3(this.plasmaState.toBuffer(), ).toString('hex'))
-    const dataSignature = await sign(this.address, dataDigest)
-    const dataSignatureAsString = util.addHexPrefix(dataSignature)
-    const concatenatedOwnersProofAsString: string = util.addHexPrefix(Buffer.concat(this.accountingService.ownersTree!.proof(util.sha3(this.address))).toString('hex'))
-
-    const tx = await this.plasmoidContract.startDispute(channelId, amount, this.address, dataSignatureAsString, checkpointId, concatenatedOwnersProofAsString)
-    return tx
-  }
-
-  async finalizeDispute (disputeRequestID: string): Promise<truffle.TransactionResult> {
-    const tx = await this.plasmoidContract.finalizeDispute(disputeRequestID)
-    return tx
-  }
-
-}
-
-function castBignumberToUint256 (n: BigNumber): Buffer {
-  return util.setLengthLeft((util.toBuffer(numberToBN(n))), 32)
-}
-
-
-export class Checkpoint {
-  id: BigNumber
-  stateTreeRoot: string
-  stateAcceptanceTreeRoot: string
-  ownersTreeRoot: string
-  ownersAcceptanceTreeRoot: string
-
-  constructor (id: BigNumber, stateTreeRoot: string, stateAcceptanceTreeRoot: string, ownersTreeRoot: string, ownersAcceptanceTreeRoot: string ) {
-    this.id = id
-    this.stateTreeRoot = stateTreeRoot
-    this.stateAcceptanceTreeRoot = stateAcceptanceTreeRoot
-    this.ownersTreeRoot = ownersTreeRoot
-    this.ownersAcceptanceTreeRoot = ownersAcceptanceTreeRoot
-  }
-}
-
-export class AccountingService {
-  accountsState: Map<string, PlasmaState>
-  checkpoints: Map<string, Checkpoint>
-  participants: Array<Participant>
-  stateTree: MerkleTree | undefined
-  stateAcceptanceTree: MerkleTree | undefined
-  ownersTree: MerkleTree | undefined
-  ownersAcceptanceTree: MerkleTree | undefined
-  checkpointIdNext: BigNumber
-
-  constructor () {
-    this.accountsState = new Map()
-    this.participants = new Array()
-    this.checkpoints = new Map()
-    this.checkpointIdNext = new BigNumber(2)
-  }
-
-  addParticipant (participant: Participant): Participant {
-    this.participants.push(participant)
-    return participant
-  }
-
-  async updateTrees (): Promise<void> {
-    const accountHashesArray: Buffer[] = this.participants.map((party: Participant) => { return util.sha3(party.address) })
-    this.stateTree = new MerkleTree(accountHashesArray)
-    // const stateMerkleRoot: string = util.addHexPrefix(this.stateTree.root.toString('hex'))
-
-    const acceptanceHashesArray: Buffer[] = await Promise.all(this.participants.map(async (party: Participant) => { return Buffer.from(await party.makeAcceptanceSignature()) }))
-    const acceptanceSHA3HashesArray: Buffer[] = acceptanceHashesArray.map((e: Buffer) => util.sha3(e))
-    this.stateAcceptanceTree = new MerkleTree(acceptanceSHA3HashesArray)
-    // const acceptanceMerkleRoot: string = util.addHexPrefix(this.acceptanceTree.root.toString('hex'))
-
-    this.ownersTree = new MerkleTree(accountHashesArray)
-    // const ownersMerkleRoot = util.addHexPrefix(this.ownersTree.root.toString('hex'))
-
-    const ownersAcceptanceHashesArray: Buffer[] = await Promise.all(this.participants.map(async (party: Participant) => { return Buffer.from(await party.makeOwnersAcceptanceSignature(this.checkpointIdNext, this.ownersTreeRoot())) }))
-    const ownersAcceptanceSHA3HashesArray: Buffer[] = ownersAcceptanceHashesArray.map((e: Buffer) => util.sha3(e))
-    this. ownersAcceptanceTree = new MerkleTree(ownersAcceptanceSHA3HashesArray)
-  }
-
-  stateTreeRoot (): string {
-    return util.addHexPrefix(this.stateTree!.root.toString('hex'))
-  }
-
-  stateAcceptanceTreeRoot (): string {
-    return util.addHexPrefix(this.stateAcceptanceTree!.root.toString('hex'))
-  }
-
-  ownersTreeRoot (): string {
-    return util.addHexPrefix(this.ownersTree!.root.toString('hex'))
-  }
-
-  ownersAcceptanceTreeRoot (): string {
-    return util.addHexPrefix(this.ownersAcceptanceTree!.root.toString('hex'))
-  }
-
-  addCheckpoint (checkpoint: Checkpoint) {
-    this.checkpoints.set(checkpoint.id.toString(), checkpoint)
-  }
-}
-
-function bufferTo0xString (buf: Buffer): string {
-  return util.addHexPrefix(buf.toString('hex'))
-}
-
-function makeStateDigest (user: string): Buffer {
-  let state: PlasmaState = accountsState.get(user)!
-  const digest = util.sha3(state.toBuffer())
-  return digest
-}
-
-function makeAcceptanceDigest (user: string): Buffer {
-  // console.log(`makeAcceptanceDigest: ${user}`)
-  let state: PlasmaState = accountsState.get(user)!
-  // console.log(JSON.stringify(accountsState))
-  const digest = util.sha3(Buffer.concat([Buffer.from('acceptCurrentState'), state.toBuffer()]))
-  return digest
-}
-
-async function sign (address: string, data: string): Promise<string> {
-  let result = await web3.eth.sign(address, data)
-  result += '01'
-  return result
-}
-
-function recover (signature: string, data: any): string {
-  signature = signature.slice(0, -2)
-  const result = ethSigUtil.recoverPersonalSignature({ sig: signature, data: data})
-  return result
-}
 
 
 contract('Plasmoid', accounts => {
@@ -319,45 +62,160 @@ contract('Plasmoid', accounts => {
       accountsState.set(BOB, new PlasmaState(channelId, new BigNumber(0), BOB))
     })
 
-    test('User did taking a part in checkpoint and operator put not valid digest', async (done) => {
-      let accountHashesArray: Buffer[] = []
+    // test('User starts a dispute and operator do not answer him', async (done) => {
+    //   let accountHashesArray: Buffer[] = []
+    //
+    //   const accountServiceOperator = new AccountService()
+    //   const accountServiceAtAlice = new AccountService()
+    //   const accountServiceAtBob = new AccountService()
+    //
+    //   const aliceAsParty: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
+    //   const bobAsParty: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
+    //   const operatorAsParty: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceOperator, channelId, new BigNumber(0))
+    //
+    //   accountServiceOperator.addParticipant(aliceAsParty)
+    //   accountServiceOperator.addParticipant(bobAsParty)
+    //   accountServiceOperator.addParticipant(operatorAsParty)
+    //
+    //   accountServiceAtAlice.addParticipant(aliceAsParty)
+    //   accountServiceAtAlice.addParticipant(bobAsParty)
+    //   accountServiceAtAlice.addParticipant(operatorAsParty)
+    //
+    //   accountServiceAtBob.addParticipant(aliceAsParty)
+    //   accountServiceAtBob.addParticipant(bobAsParty)
+    //   accountServiceAtBob.addParticipant(operatorAsParty)
+    //
+    //   await plasmoid.setSettlingPeriod(1)
+    //
+    //   const txCheckpoint = await operatorAsParty.makeCheckpoint()
+    //   // FIXME method updateCheckpoint map on others
+    //   const checkpointId: BigNumber = (txCheckpoint.logs[0].args as PlasmoidWrapper.DidCheckpoint).checkpointId as BigNumber
+    //   await operatorAsParty.transfer(channelId, ALICE, BOB)
+    //
+    //   const txDispute = await bobAsParty.startDispute(channelId, new BigNumber(2000), checkpointId)
+    //   const eventArgsAddToDispute: PlasmoidWrapper.DidAddToDisputeQueue = txDispute.logs[0].args
+    //
+    //   setTimeout(async () => {
+    //     const tx4 = await bobAsParty.finalizeDispute(eventArgsAddToDispute.disputeRequestID)
+    //     expect(tx4.logs[0] && PlasmoidWrapper.isDidFinalizeDisputeEvent(tx4.logs[0])).toBeTruthy()
+    //     done()
+    //   }, 2500)
+    // })
 
-      const accountServiceOperator = new AccountingService()
-      const accountServiceAtAlice = new AccountingService()
-      const accountServiceAtBob = new AccountingService()
+    test('User starts a dispute and operator has a correct data for answer', async () => {
+      // Account service at Alice Machine
+      const accountServiceAtAlice = new AccountService()
+      // Account service at Bob Machine
+      const accountServiceAtBob = new AccountService()
+      // Account service at Operator Machine
+      const accountServiceAtOperator = new AccountService()
 
-      const aliceAsParty: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
-      const bobAsParty: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
-      const operatorAsParty: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceOperator, channelId, new BigNumber(0))
 
-      accountServiceOperator.addParticipant(aliceAsParty)
-      accountServiceOperator.addParticipant(bobAsParty)
-      accountServiceOperator.addParticipant(operatorAsParty)
+      // Alice user at Alice Machine
+      const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
+      // Bob user at Alice Machine
+      const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
+      // Operator user at Alice Machine
+      const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, channelId, new BigNumber(0))
 
-      accountServiceAtAlice.addParticipant(aliceAsParty)
-      accountServiceAtAlice.addParticipant(bobAsParty)
-      accountServiceAtAlice.addParticipant(operatorAsParty)
+      // Alice user at Bob Machine
+      const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
+      // Bob user at Bob Machine
+      const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
+      // Operator user at Bob Machine
+      const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, channelId, new BigNumber(0))
 
-      accountServiceAtBob.addParticipant(aliceAsParty)
-      accountServiceAtBob.addParticipant(bobAsParty)
-      accountServiceAtBob.addParticipant(operatorAsParty)
+      // Alice user at Operator Machine
+      const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
+      // Bob user at Operator Machine
+      const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
+      // Operator user at Operator Machine
+      const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, channelId, new BigNumber(0))
 
-      await plasmoid.setSettlingPeriod(1)
+      accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
+      accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
+      accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
 
-      const txCheckpoint = await operatorAsParty.makeCheckpoint()
+      accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
+      accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
+      accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
+
+      accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
+      accountServiceAtBob.addParticipant(bobAsPartyAtBob)
+      accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
+
+      const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
       // FIXME method updateCheckpoint map on others
       const checkpointId: BigNumber = (txCheckpoint.logs[0].args as PlasmoidWrapper.DidCheckpoint).checkpointId as BigNumber
-      await operatorAsParty.transfer(channelId, ALICE, BOB)
+      await operatorAsPartyAtOperator.transfer(channelId, ALICE, BOB)
 
-      const txDispute =  await bobAsParty.startDispute(channelId, new BigNumber(2000), checkpointId)
-      const eventArgsAddToDispute: PlasmoidWrapper.DidAddToDisputeQueue = txDispute.logs[0].args
+      const txStartDispute = await bobAsPartyAtBob.startDispute(channelId, new BigNumber(2000), checkpointId)
+      const eventArgsAddToDispute: PlasmoidWrapper.DidAddToDisputeQueue = txStartDispute.logs[0].args
 
-      setTimeout(async () => {
-        const tx4 = await bobAsParty.finalizeDispute(eventArgsAddToDispute.disputeRequestID)
-        expect(tx4.logs[0] && PlasmoidWrapper.isDidFinalizeDisputeEvent(tx4.logs[0])).toBeTruthy()
-        done()
-      }, 2500)
+      const bob = accountServiceAtOperator.getParticipantByAddress(BOB)!
+      const acceptanceSignatureForBob = await bob.makeAcceptanceSignature()
+      // console.log(acceptanceSignatureForBob)
+      const keccakkedAcceptanceSignatureForBob = solUtils.keccak256(stringToBytes(acceptanceSignatureForBob))
+
+      // console.log(`acceptanceSignatureForBob = ${acceptanceSignatureForBob}`)
+      // console.log(`keccakkedAcceptanceSignatureForBob = ${solUtils.bytes32To0xString(keccakkedAcceptanceSignatureForBob)}`)
+
+      // console.log(solUtils.bufferTo0xString(keccakkedAcceptanceSignatureForBob))
+      // console.log(JSON.stringify(keccakkedAcceptanceSignatureForBob))
+      // console.log(JSON.stringify(accountServiceAtOperator.stateAcceptanceTree!))
+      const acceptanceProofsForBob = accountServiceAtOperator.stateAcceptanceTree!.proof(keccakkedAcceptanceSignatureForBob)
+
+      // acceptanceProofsForBob.map(el => console.log(solUtils.bufferTo0xString(el)))
+
+      // console.log(`acceptanceSignatureForBob = ${acceptanceSignatureForBob}`)
+      const txAnswerDispute = await operatorAsPartyAtOperator.answerDispute(bob.plasmaState,
+        eventArgsAddToDispute.disputeRequestID,
+        acceptanceSignatureForBob,
+        solUtils.bufferArrayTo0xString(acceptanceProofsForBob))
+
+      PlasmoidWrapper.printEvents(txAnswerDispute)
+      expect(txAnswerDispute.logs[0] && PlasmoidWrapper.isDidAnswerDisputeEvent(txAnswerDispute.logs[0])).toBeTruthy()
     })
+
+    // test('User did taking a part in checkpoint and operator put not valid digest', async (done) => {
+    //   let accountHashesArray: Buffer[] = []
+    //
+    //   const accountServiceOperator = new AccountService()
+    //   const accountServiceAtAlice = new AccountService()
+    //   const accountServiceAtBob = new AccountService()
+    //
+    //   const aliceAsParty: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, channelId, new BigNumber(90))
+    //   const bobAsParty: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, channelId, new BigNumber(10))
+    //   const operatorAsParty: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceOperator, channelId, new BigNumber(0))
+    //
+    //   accountServiceOperator.addParticipant(aliceAsParty)
+    //   accountServiceOperator.addParticipant(bobAsParty)
+    //   accountServiceOperator.addParticipant(operatorAsParty)
+    //
+    //   accountServiceAtAlice.addParticipant(aliceAsParty)
+    //   accountServiceAtAlice.addParticipant(bobAsParty)
+    //   accountServiceAtAlice.addParticipant(operatorAsParty)
+    //
+    //   accountServiceAtBob.addParticipant(aliceAsParty)
+    //   accountServiceAtBob.addParticipant(bobAsParty)
+    //   accountServiceAtBob.addParticipant(operatorAsParty)
+    //
+    //   await plasmoid.setSettlingPeriod(1)
+    //
+    //   const txCheckpoint = await operatorAsParty.makeCheckpoint()
+    //   // FIXME method updateCheckpoint map on others
+    //   const checkpointId: BigNumber = (txCheckpoint.logs[0].args as PlasmoidWrapper.DidCheckpoint).checkpointId as BigNumber
+    //   await operatorAsParty.transfer(channelId, ALICE, BOB)
+    //
+    //   const txDispute = await bobAsParty.startDispute(channelId, new BigNumber(2000), checkpointId)
+    //   const eventArgsAddToDispute: PlasmoidWrapper.DidAddToDisputeQueue = txDispute.logs[0].args
+    //
+    //   setTimeout(async () => {
+    //     const tx4 = await bobAsParty.finalizeDispute(eventArgsAddToDispute.disputeRequestID)
+    //     expect(tx4.logs[0] && PlasmoidWrapper.isDidFinalizeDisputeEvent(tx4.logs[0])).toBeTruthy()
+    //     done()
+    //   }, 2500)
+    // })
 
     // test('User did NOT taking a part in checkpoint and wants to create dispute', async (done) => {
     //   let accountHashesArray: Buffer[] = []
@@ -748,155 +606,155 @@ contract('Plasmoid', accounts => {
   //   })
   // })
 
-  describe('deposit', () => {
-    test('move token to contract', async () => {
-      const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
-      expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
-
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      await plasmoid.deposit(VALUE, { from: ALICE })
-
-      const participantAfter = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
-
-      expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
-      expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
-    })
-    test('emit event', async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-      const event = tx.logs[0]
-      const eventArgs: PlasmoidWrapper.DidDeposit = event.args
-      expect(PlasmoidWrapper.isDidDepositEvent(event))
-      expect(eventArgs.owner).toEqual(ALICE)
-      LOG.info(eventArgs.amount.toString())
-      expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
-    })
-    test('set balance', async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-      const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
-      const channelId = eventArgs.channelId as BigNumber
-
-      const accountAfter = await plasmoid.balanceOf(channelId)
-      expect(accountAfter.toString()).toEqual(VALUE.toString())
-    })
-  })
-
-  describe('withdraw', () => {
-    let channelId: BigNumber
-
-    beforeEach(async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-      const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
-      channelId = eventArgs.channelId as BigNumber
-    })
-
-    test('withdraw token from contract', async () => {
-      const participantBefore = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
-      expect(participantBefore.toString()).toEqual(MINTED.minus(VALUE).toString())
-      expect(plasmoidBalanceBefore.toString()).toEqual(VALUE.toString())
-
-      await plasmoid.withdraw(channelId, { from: ALICE })
-
-      const participantAfter = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
-
-      expect(participantAfter.toString()).toEqual(MINTED.toString())
-      expect(plasmoidBalanceAfter.toString()).toEqual('0')
-    })
-    test('emit event', async () => {
-      const tx = await plasmoid.withdraw(channelId, { from: ALICE })
-      const event = tx.logs[0]
-      const eventArgs: PlasmoidWrapper.DidWithdraw = tx.logs[0].args
-      expect(PlasmoidWrapper.isDidWithdrawEvent(event))
-      expect(eventArgs.channelId).toEqual(channelId)
-      expect(eventArgs.owner).toEqual(ALICE)
-      expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
-    })
-    test('set balance', async () => {
-      const balanceBefore = await plasmoid.balanceOf(channelId)
-      expect(balanceBefore.toString()).toEqual(VALUE.toString())
-
-      await plasmoid.withdraw(channelId, { from: ALICE })
-
-      const balanceAfter = await plasmoid.balanceOf(channelId)
-      expect(balanceAfter.toString()).toEqual('0')
-    })
-    test('not if not owner', async () => {
-      await expect(plasmoid.withdraw(channelId, { from: ALIEN })).rejects.toBeTruthy()
-    })
-  })
-
-  describe('transfer', () => {
-    let channelId: BigNumber
-
-    beforeEach(async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-      channelId = tx.logs[0].args.channelId as BigNumber
-    })
-
-    test('change ownership', async () => {
-      const ownerBefore = await plasmoid.owners(channelId)
-      expect(ownerBefore).toEqual(ALICE)
-      await plasmoid.transfer(channelId, BOB, '0x00', { from: ALICE })
-      const ownerAfter = await plasmoid.owners(channelId)
-      expect(ownerAfter).toEqual(BOB)
-    })
-
-    test('emit event', async () => {
-      const tx = await plasmoid.transfer(channelId, BOB, '0x00', { from: ALICE })
-      const event = tx.logs[0]
-      const eventArgs: PlasmoidWrapper.DidTransfer = tx.logs[0].args
-      expect(event.event).toEqual('DidTransfer')
-      expect(eventArgs.channelId.toString()).toEqual(channelId.toString())
-      expect(eventArgs.owner).toEqual(ALICE)
-      expect(eventArgs.receiver).toEqual(BOB)
-    })
-    test('not if not owner', async () => {
-      await expect(plasmoid.transfer(channelId, BOB, '0x00', { from: ALIEN })).rejects.toBeTruthy()
-    })
-  })
-
-  describe('transfer, delegate', () => {
-    let channelId: BigNumber
-
-    beforeEach(async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-      const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
-      channelId = eventArgs.channelId as BigNumber
-    })
-
-    test('change ownership', async () => {
-      const ownerBefore = await plasmoid.owners(channelId)
-      expect(ownerBefore).toEqual(ALICE)
-      let digest = await plasmoid.transferDigest(channelId, BOB)
-      let signature = await sign(ALICE, digest)
-      await plasmoid.transfer(channelId, BOB, signature)
-      const ownerAfter = await plasmoid.owners(channelId)
-      expect(ownerAfter).toEqual(BOB)
-    })
-    test('emit event', async () => {
-      let digest = await plasmoid.transferDigest(channelId, BOB)
-      let signature = await sign(ALICE, digest)
-      let tx = await plasmoid.transfer(channelId, BOB, signature)
-      let event = tx.logs[0]
-      let eventArgs: PlasmoidWrapper.DidTransfer = event.args
-      expect(PlasmoidWrapper.isDidTransferEvent(event))
-      expect(eventArgs.owner).toEqual(ALICE)
-      expect(eventArgs.channelId).toEqual(channelId)
-      expect(eventArgs.receiver).toEqual(BOB)
-
-    })
-    test('not if not owner', async () => {
-      let digest = await plasmoid.transferDigest(channelId, BOB)
-      let signature = await sign(ALIEN, digest)
-      await expect(plasmoid.transfer(channelId, BOB, signature)).rejects.toBeTruthy()
-    })
-  })
+  // describe('deposit', () => {
+  //   test('move token to contract', async () => {
+  //     const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
+  //     const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+  //     expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
+  //
+  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+  //     await plasmoid.deposit(VALUE, { from: ALICE })
+  //
+  //     const participantAfter = await mintableToken.balanceOf(ALICE)
+  //     const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+  //
+  //     expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
+  //     expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
+  //   })
+  //   test('emit event', async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     const event = tx.logs[0]
+  //     const eventArgs: PlasmoidWrapper.DidDeposit = event.args
+  //     expect(PlasmoidWrapper.isDidDepositEvent(event))
+  //     expect(eventArgs.owner).toEqual(ALICE)
+  //     LOG.info(eventArgs.amount.toString())
+  //     expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
+  //   })
+  //   test('set balance', async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+  //     const channelId = eventArgs.channelId as BigNumber
+  //
+  //     const accountAfter = await plasmoid.balanceOf(channelId)
+  //     expect(accountAfter.toString()).toEqual(VALUE.toString())
+  //   })
+  // })
+  //
+  // describe('withdraw', () => {
+  //   let channelId: BigNumber
+  //
+  //   beforeEach(async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+  //     channelId = eventArgs.channelId as BigNumber
+  //   })
+  //
+  //   test('withdraw token from contract', async () => {
+  //     const participantBefore = await mintableToken.balanceOf(ALICE)
+  //     const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+  //     expect(participantBefore.toString()).toEqual(MINTED.minus(VALUE).toString())
+  //     expect(plasmoidBalanceBefore.toString()).toEqual(VALUE.toString())
+  //
+  //     await plasmoid.withdraw(channelId, { from: ALICE })
+  //
+  //     const participantAfter = await mintableToken.balanceOf(ALICE)
+  //     const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+  //
+  //     expect(participantAfter.toString()).toEqual(MINTED.toString())
+  //     expect(plasmoidBalanceAfter.toString()).toEqual('0')
+  //   })
+  //   test('emit event', async () => {
+  //     const tx = await plasmoid.withdraw(channelId, { from: ALICE })
+  //     const event = tx.logs[0]
+  //     const eventArgs: PlasmoidWrapper.DidWithdraw = tx.logs[0].args
+  //     expect(PlasmoidWrapper.isDidWithdrawEvent(event))
+  //     expect(eventArgs.channelId).toEqual(channelId)
+  //     expect(eventArgs.owner).toEqual(ALICE)
+  //     expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
+  //   })
+  //   test('set balance', async () => {
+  //     const balanceBefore = await plasmoid.balanceOf(channelId)
+  //     expect(balanceBefore.toString()).toEqual(VALUE.toString())
+  //
+  //     await plasmoid.withdraw(channelId, { from: ALICE })
+  //
+  //     const balanceAfter = await plasmoid.balanceOf(channelId)
+  //     expect(balanceAfter.toString()).toEqual('0')
+  //   })
+  //   test('not if not owner', async () => {
+  //     await expect(plasmoid.withdraw(channelId, { from: ALIEN })).rejects.toBeTruthy()
+  //   })
+  // })
+  //
+  // describe('transfer', () => {
+  //   let channelId: BigNumber
+  //
+  //   beforeEach(async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     channelId = tx.logs[0].args.channelId as BigNumber
+  //   })
+  //
+  //   test('change ownership', async () => {
+  //     const ownerBefore = await plasmoid.owners(channelId)
+  //     expect(ownerBefore).toEqual(ALICE)
+  //     await plasmoid.transfer(channelId, BOB, '0x00', { from: ALICE })
+  //     const ownerAfter = await plasmoid.owners(channelId)
+  //     expect(ownerAfter).toEqual(BOB)
+  //   })
+  //
+  //   test('emit event', async () => {
+  //     const tx = await plasmoid.transfer(channelId, BOB, '0x00', { from: ALICE })
+  //     const event = tx.logs[0]
+  //     const eventArgs: PlasmoidWrapper.DidTransfer = tx.logs[0].args
+  //     expect(event.event).toEqual('DidTransfer')
+  //     expect(eventArgs.channelId.toString()).toEqual(channelId.toString())
+  //     expect(eventArgs.owner).toEqual(ALICE)
+  //     expect(eventArgs.receiver).toEqual(BOB)
+  //   })
+  //   test('not if not owner', async () => {
+  //     await expect(plasmoid.transfer(channelId, BOB, '0x00', { from: ALIEN })).rejects.toBeTruthy()
+  //   })
+  // })
+  //
+  // describe('transfer, delegate', () => {
+  //   let channelId: BigNumber
+  //
+  //   beforeEach(async () => {
+  //     await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
+  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+  //     const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+  //     channelId = eventArgs.channelId as BigNumber
+  //   })
+  //
+  //   test('change ownership', async () => {
+  //     const ownerBefore = await plasmoid.owners(channelId)
+  //     expect(ownerBefore).toEqual(ALICE)
+  //     let digest = await plasmoid.transferDigest(channelId, BOB)
+  //     let signature = await sign(ALICE, digest)
+  //     await plasmoid.transfer(channelId, BOB, signature)
+  //     const ownerAfter = await plasmoid.owners(channelId)
+  //     expect(ownerAfter).toEqual(BOB)
+  //   })
+  //   test('emit event', async () => {
+  //     let digest = await plasmoid.transferDigest(channelId, BOB)
+  //     let signature = await sign(ALICE, digest)
+  //     let tx = await plasmoid.transfer(channelId, BOB, signature)
+  //     let event = tx.logs[0]
+  //     let eventArgs: PlasmoidWrapper.DidTransfer = event.args
+  //     expect(PlasmoidWrapper.isDidTransferEvent(event))
+  //     expect(eventArgs.owner).toEqual(ALICE)
+  //     expect(eventArgs.channelId).toEqual(channelId)
+  //     expect(eventArgs.receiver).toEqual(BOB)
+  //
+  //   })
+  //   test('not if not owner', async () => {
+  //     let digest = await plasmoid.transferDigest(channelId, BOB)
+  //     let signature = await sign(ALIEN, digest)
+  //     await expect(plasmoid.transfer(channelId, BOB, signature)).rejects.toBeTruthy()
+  //   })
+  // })
 })

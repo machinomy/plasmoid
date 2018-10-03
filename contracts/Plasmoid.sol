@@ -35,6 +35,7 @@ contract Plasmoid is Ownable {
     event DidAddToExitingQueue(uint256 indexed channelId, uint256 indexed channelAmount, address indexed owner, uint256 checkpointId, uint256 withdrawalRequestMoment, bytes32 withdrawalRequestID);
     event DidStartDispute(uint256 checkpointId, uint256 channelId, uint256 amount, address owner);
     event DidAddToDisputeQueue(uint256 indexed channelId, uint256 indexed channelAmount, address indexed owner, uint256 checkpointId, uint256 disputeRequestMoment, bytes32 disputeRequestID);
+    event DidAnswerDispute(bytes32 disputeRequestID);
     event DidFinalizeDispute(bytes32 disputeRequestID);
 
     struct Checkpoint {
@@ -179,6 +180,7 @@ contract Plasmoid is Ownable {
         uint256 _checkpointId = exitQueue[_withdrawalRequestID].checkpointId;
         uint256 _channelAmount = exitQueue[_withdrawalRequestID].channelAmount;
         address _owner = exitQueue[_withdrawalRequestID].owner;
+
         require(_withdrawalRequestMoment + settlingPeriod < block.timestamp);
         require(token.transfer(_owner, _channelAmount), "Can not transfer tokens to owner");
 
@@ -194,15 +196,19 @@ contract Plasmoid is Ownable {
     function startDispute (uint256 _channelId, uint256 _amount, address _owner, bytes _signature, uint256 _checkpointId, bytes _ownersMerkleProof) public {
         // need to keccak all params here!
         bytes32 inputHash = keccak256(abi.encodePacked(_channelId, _amount, _owner, _checkpointId));
+
         require(isValidSignature(inputHash, _owner, _signature), "ONLY_OWNER_CAN_DISPUTE");
+
         bytes32 ownersMerkleRoot = checkpoints[_checkpointId].ownersMerkleRoot;
+
         require(isContained(ownersMerkleRoot, _ownersMerkleProof, keccak256(abi.encodePacked(_owner))), "Owner is not in owners merkle root");
-        addToDisputeQueue(_owner, _amount, _channelId, _checkpointId);
+
+        addToDisputeQueue(_channelId, _amount, _owner, _checkpointId);
 
         emit DidStartDispute(_checkpointId, _channelId, _amount, _owner);
     }
 
-    function addToDisputeQueue (address _owner, uint256 _channelAmount, uint256 _channelId, uint256 _checkpointId) internal {
+    function addToDisputeQueue (uint256 _channelId, uint256 _channelAmount, address _owner, uint256 _checkpointId) internal {
         uint256 timestamp = block.timestamp;
         bytes32 _stateDigest = keccak256(abi.encodePacked(_channelId, _channelAmount, _owner, timestamp));
         disputeQueue[_stateDigest] = DisputeQueueElement({ channelId: _channelId, channelAmount: _channelAmount, owner: _owner, checkpointId: _checkpointId, disputeRequestMoment: timestamp });
@@ -210,24 +216,30 @@ contract Plasmoid is Ownable {
         emit DidAddToDisputeQueue(_channelId, _channelAmount, _owner, _checkpointId, timestamp, _stateDigest);
     }
 
-    function answerDispute (bytes32 _disputeRequestID, bytes _acceptanceMerkleProof) public {
-        uint256 channelId = disputeQueue[_disputeRequestID].channelId;
-        uint256 channelAmount = disputeQueue[_disputeRequestID].channelAmount;
-        address owner = disputeQueue[_disputeRequestID].owner;
+    function answerDispute (uint256 _channelId, uint256 _channelAmount, bytes32 _disputeRequestID, bytes _acceptanceSignature, bytes _acceptanceMerkleProof) public {
         uint256 checkpointId = disputeQueue[_disputeRequestID].checkpointId;
+        address owner = disputeQueue[_disputeRequestID].owner;
 
-        bytes32 acceptanceHash = acceptCurrentStateDigest(channelId, channelAmount, owner);
+        bytes32 acceptanceHash = acceptCurrentStateDigest(_channelId, _channelAmount, owner);
+
+        require(isValidSignature(acceptanceHash, owner, _acceptanceSignature), "Signature is not valid");
+
         bytes32 acceptanceMerkleRoot = checkpoints[checkpointId].stateAcceptanceMerkleRoot;
 
-        require(isContained(acceptanceMerkleRoot, _acceptanceMerkleProof, acceptanceHash), "Acceptance hash is not in merkle root");
+        require(isContained(acceptanceMerkleRoot, _acceptanceMerkleProof, keccak256(_acceptanceSignature)), "Acceptance hash is not in merkle root");
 
         delete disputeQueue[_disputeRequestID];
+
+        emit DidAnswerDispute(_disputeRequestID);
     }
 
     function finalizeDispute (bytes32 _disputeRequestID) public {
         require(disputeQueue[_disputeRequestID].owner != 0, 'Dispute element does not exists');
+
         uint256 _disputeRequestMoment = disputeQueue[_disputeRequestID].disputeRequestMoment;
+
         require(_disputeRequestMoment + settlingPeriod < block.timestamp);
+
         halt = true;
 
         emit DidFinalizeDispute(_disputeRequestID);
