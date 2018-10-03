@@ -155,7 +155,7 @@ contract('Plasmoid', accounts => {
       const bob = accountServiceAtOperator.getParticipantByAddress(BOB)!
       const acceptanceSignatureForBob = await bob.makeAcceptanceSignature()
       // console.log(acceptanceSignatureForBob)
-      const keccakkedAcceptanceSignatureForBob = solUtils.keccak256(stringToBytes(acceptanceSignatureForBob))
+      const keccakkedAcceptanceSignatureForBob = solUtils.keccak256(solUtils.stringToBytes(acceptanceSignatureForBob))
 
       // console.log(`acceptanceSignatureForBob = ${acceptanceSignatureForBob}`)
       // console.log(`keccakkedAcceptanceSignatureForBob = ${solUtils.bytes32To0xString(keccakkedAcceptanceSignatureForBob)}`)
