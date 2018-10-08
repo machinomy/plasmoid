@@ -63,12 +63,32 @@ contract('Plasmoid', accounts => {
       })
 
     test('emit event', async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
       const tx = await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
       const event = tx.logs[0]
       const eventArgs: PlasmoidWrapper.DidDeposit = event.args
       expect(PlasmoidWrapper.isDidDepositEvent(event))
       expect(eventArgs.lock).toEqual(PLASMOID_OWNER)
       expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
+    })
+  })
+
+  describe('DepositWithdraw', () => {
+    beforeEach(async () => { })
+
+    test('emit event', async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      const tx = await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
+      const event = tx.logs[0]
+      const eventArgs: PlasmoidWrapper.DidDeposit = event.args
+      const depositID: BigNumber =  eventArgs.id as BigNumber
+      const tx2 = await plasmoid.depositWithdraw(depositID, PLASMOID_OWNER, { from: BOB })
+      const event2 = tx2.logs[0]
+      const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = event2.args
+      expect(PlasmoidWrapper.isDidDepositWithdrawEvent(event2))
+      expect(eventArgs2.id.toString()).toEqual('1')
+      expect(eventArgs2.depositID).toEqual(eventArgs.id)
+      expect(eventArgs2.unlock).toEqual(PLASMOID_OWNER)
     })
   })
 })

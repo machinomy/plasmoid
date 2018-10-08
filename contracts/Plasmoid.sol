@@ -19,6 +19,7 @@ contract Plasmoid {
     uint256 depositIDNow;
     uint256 lastCheckpointID;
     uint256 withdrawalQueueIDNow;
+    uint256 depositWithdrawalQueueIDNow;
 
     enum SignatureType {
         Caller, // 0x00
@@ -34,8 +35,8 @@ contract Plasmoid {
 
     struct DepositWithdrawalRequest {
         uint256 id;
-        uint256 lastWithdrawalRequest;
         uint256 depositID;
+        address unlock;
     }
 
     struct Deposit {
@@ -76,6 +77,7 @@ contract Plasmoid {
     mapping (address => bool) public trustedTransactionsList;
 
     event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
+    event DidDepositWithdraw(uint256 id, uint256 depositID, address unlock);
 
     bool halt = false;
 
@@ -84,6 +86,7 @@ contract Plasmoid {
         depositIDNow = 1;
         lastCheckpointID = 0;
         withdrawalQueueIDNow = 1;
+        depositWithdrawalQueueIDNow = 1;
     }
 
     /// @notice User deposits funds to the contract.
@@ -124,17 +127,20 @@ contract Plasmoid {
     function finishWithdraw (uint256 withdrawalID) {
         WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
         uint256 checkpointID = withdrawalRequest.checkpointID;
-        Checkpoint checkpoint = checkpoints[checkpointID];
+        Checkpoint storage checkpoint = checkpoints[checkpointID];
         uint256 amount = withdrawalRequest.amount;
         require(checkpoint.valid == true, "Checkpoint is not valid");
 //        require(token.transfer(owner, amount), "Can not transfer tokens to owner");
     }
 
     /// @notice Initiate withdrawal from the deposit that has not been included in to a checkpoint.
-    /// @param depositID depositID
-    /// @param unlock unlock
-    function depositWithdraw (uint256 depositID, bytes unlock) {
+    /// @param _depositID depositID
+    /// @param _unlock unlock
+    function depositWithdraw (uint256 _depositID, address _unlock) public {
+        depositWithdrawalQueue[depositWithdrawalQueueIDNow] = DepositWithdrawalRequest({ id: depositWithdrawalQueueIDNow, depositID: _depositID, unlock: _unlock });
+        emit DidDepositWithdraw(depositWithdrawalQueueIDNow, _depositID, _unlock);
 
+        depositWithdrawalQueueIDNow = depositWithdrawalQueueIDNow.add(1);
     }
 
     /// @notice Challenge the withdrawal request by showing that the deposit is included into the current checkpoint.
