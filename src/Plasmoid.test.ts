@@ -81,7 +81,7 @@ contract('Plasmoid', accounts => {
       const tx = await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
       const event = tx.logs[0]
       const eventArgs: PlasmoidWrapper.DidDeposit = event.args
-      const depositID: BigNumber =  eventArgs.id as BigNumber
+      const depositID: BigNumber = eventArgs.id as BigNumber
       const tx2 = await plasmoid.depositWithdraw(depositID, PLASMOID_OWNER, { from: BOB })
       const event2 = tx2.logs[0]
       const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = event2.args
@@ -89,6 +89,42 @@ contract('Plasmoid', accounts => {
       expect(eventArgs2.id.toString()).toEqual('1')
       expect(eventArgs2.depositID).toEqual(eventArgs.id)
       expect(eventArgs2.unlock).toEqual(PLASMOID_OWNER)
+      expect(eventArgs2.owner).toEqual(BOB)
+    })
+  })
+
+  describe('FinaliseDepositWithdraw', () => {
+    beforeEach(async () => { })
+
+    test('emit event', async (done) => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+
+      await plasmoid.setDepositWithdrawalPeriod(1)
+
+      const tx = await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
+      const event = tx.logs[0]
+      const eventArgs: PlasmoidWrapper.DidDeposit = event.args
+      const depositID: BigNumber = eventArgs.id as BigNumber
+      const tx2 = await plasmoid.depositWithdraw(depositID, PLASMOID_OWNER, { from: BOB })
+      const event2 = tx2.logs[0]
+      const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = event2.args
+      const depositWithdrawID: BigNumber =  eventArgs2.id as BigNumber
+      expect(PlasmoidWrapper.isDidDepositWithdrawEvent(event2))
+      expect(eventArgs2.id.toString()).toEqual('1')
+      expect(eventArgs2.depositID).toEqual(eventArgs.id)
+      expect(eventArgs2.unlock).toEqual(PLASMOID_OWNER)
+
+      setTimeout(async () => {
+        const plasmoidBalanceBefore: BigNumber = (await mintableToken.balanceOf(plasmoid.address)) as BigNumber
+        const tx3 = await plasmoid.finaliseDepositWithdraw(depositWithdrawID, { from: BOB })
+        const plasmoidBalanceAfter: BigNumber = (await mintableToken.balanceOf(plasmoid.address)) as BigNumber
+        expect(plasmoidBalanceAfter.toString()).toEqual((plasmoidBalanceBefore.toNumber() - VALUE.toNumber()).toString())
+
+        const event3 = tx3.logs[0]
+        const eventArgs3: PlasmoidWrapper.DidFinaliseDepositWithdraw = event3.args
+        expect(eventArgs3.id.toString()).toEqual(depositWithdrawID.toString())
+        done()
+      }, 2500)
     })
   })
 })

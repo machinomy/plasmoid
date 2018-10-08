@@ -1,5 +1,4 @@
 pragma solidity ^0.4.24;
-pragma experimental ABIEncoderV2;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
@@ -14,6 +13,7 @@ contract Plasmoid {
     StandardToken public token;
 
     uint256 public settlingPeriod = 2 days;
+    uint256 public depositWithdrawalPeriod = 2 days;
     uint256 public withdrawalPeriod = 2 days;
 
     uint256 depositIDNow;
@@ -37,6 +37,8 @@ contract Plasmoid {
         uint256 id;
         uint256 depositID;
         address unlock;
+        address owner;
+        uint256 checkpointID;
     }
 
     struct Deposit {
@@ -77,7 +79,8 @@ contract Plasmoid {
     mapping (address => bool) public trustedTransactionsList;
 
     event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
-    event DidDepositWithdraw(uint256 id, uint256 depositID, address unlock);
+    event DidDepositWithdraw(uint256 id, uint256 depositID, address unlock, address owner, uint256 checkpointID);
+    event DidFinaliseDepositWithdraw(uint256 id);
 
     bool halt = false;
 
@@ -87,6 +90,21 @@ contract Plasmoid {
         lastCheckpointID = 0;
         withdrawalQueueIDNow = 1;
         depositWithdrawalQueueIDNow = 1;
+    }
+
+    function setSettlingPeriod (uint256 _settlingPeriod) public {
+        require(_settlingPeriod > 0, "Settling period must be > 0");
+        settlingPeriod = _settlingPeriod;
+    }
+
+    function setDepositWithdrawalPeriod (uint256 _depositWithdrawalPeriod) public {
+        require(_depositWithdrawalPeriod > 0, "Deposit withdrawal period must be > 0");
+        depositWithdrawalPeriod = _depositWithdrawalPeriod;
+    }
+
+    function setWithdrawalPeriod (uint256 _withdrawalPeriod) public {
+        require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
+        withdrawalPeriod = _withdrawalPeriod;
     }
 
     /// @notice User deposits funds to the contract.
@@ -137,23 +155,45 @@ contract Plasmoid {
     /// @param _depositID depositID
     /// @param _unlock unlock
     function depositWithdraw (uint256 _depositID, address _unlock) public {
-        depositWithdrawalQueue[depositWithdrawalQueueIDNow] = DepositWithdrawalRequest({ id: depositWithdrawalQueueIDNow, depositID: _depositID, unlock: _unlock });
-        emit DidDepositWithdraw(depositWithdrawalQueueIDNow, _depositID, _unlock);
+        depositWithdrawalQueue[depositWithdrawalQueueIDNow] = DepositWithdrawalRequest({    id: depositWithdrawalQueueIDNow,
+                                                                                            depositID: _depositID,
+                                                                                            unlock: _unlock,
+                                                                                            owner: msg.sender,
+                                                                                            checkpointID: 0 });
+        emit DidDepositWithdraw(depositWithdrawalQueueIDNow, _depositID, _unlock, msg.sender, depositWithdrawalQueue[depositWithdrawalQueueIDNow].checkpointID);
 
         depositWithdrawalQueueIDNow = depositWithdrawalQueueIDNow.add(1);
     }
 
     /// @notice Challenge the withdrawal request by showing that the deposit is included into the current checkpoint.
+    function challengeDepositWithdraw (uint256 _depositWithdrawalID, bytes _proof) {
+        DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
+        uint256 depositID = depositWithdrawalRequest.depositID;
+        Deposit _deposit = deposits[depositID];
+        uint256 depositWithdrawalTimestamp = _deposit.timestamp;
 
-    function challengeDepositWithdraw (uint256 depositWithdrawalID, bytes proof) {
-        DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[depositWithdrawalID];
-//        WithdrawalRequest withdrawalRequest = depositWithdrawalRequest.depositID
-//        prove(deposit.amount, deposit.assetType.lock, deposit.unlock, checkpoint, proof)
+        require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
+
+//        prove(_deposit.amount, _deposit.lock, _deposit.unlock, checkpoint, _proof);
+
+        delete depositWithdrawalQueue[_depositWithdrawalID];
     }
 
     /// @notice If the withdraw attempt has not been challenged during timeout, process with the withdrawal.
     function finaliseDepositWithdraw (uint256 depositWithdrawalID) {
+        uint256 depositID = depositWithdrawalQueue[depositWithdrawalID].depositID;
+        uint256 depositWithdrawalTimestamp = deposits[depositID].timestamp;
+        address owner = depositWithdrawalQueue[depositWithdrawalID].owner;
+        uint256 amount = deposits[depositID].amount;
 
+        require(depositWithdrawalQueue[depositWithdrawalID].id != 0, "Deposit withdrawal request is not present");
+        require(block.timestamp > depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period still proceed");
+
+        require(token.transfer(owner, amount), "Can not transfer tokens to owner");
+
+        delete depositWithdrawalQueue[depositWithdrawalID];
+
+        emit DidFinaliseDepositWithdraw(depositWithdrawalID);
     }
 
     /// @notice Ask the operator for contents of the slot in the checkpoint.
