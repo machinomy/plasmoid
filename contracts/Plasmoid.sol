@@ -89,11 +89,13 @@ contract Plasmoid {
     /// @notice User deposits funds to the contract.
     /// @notice Add an entry to Deposits list, increase Deposit Counter.
     /// @notice Future: Use an asset manager to transfer the asset into the contract.
-    /// @param amount Amount of asset
-    /// @param owner lock
-    function deposit(uint256 amount, address owner) public {
-        deposits[depositIDNow] = Deposit({ id: depositIDNow, amount: amount, lock: owner, timestamp: block.timestamp });
-        emit DidDeposit(depositIDNow, amount, owner, deposits[depositIDNow].timestamp);
+    /// @param _amount Amount of asset
+    /// @param _owner lock
+    function deposit(uint256 _amount, address _owner) public {
+        require(_amount > 0, "Can not deposit 0");
+        require(token.transferFrom(msg.sender, address(this), _amount));
+        deposits[depositIDNow] = Deposit({ id: depositIDNow, amount: _amount, lock: _owner, timestamp: block.timestamp });
+        emit DidDeposit(depositIDNow, _amount, _owner, deposits[depositIDNow].timestamp);
 
         depositIDNow = depositIDNow.add(1);
     }

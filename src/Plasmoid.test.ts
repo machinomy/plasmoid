@@ -47,6 +47,21 @@ contract('Plasmoid', accounts => {
   describe('Deposit', () => {
     beforeEach(async () => { })
 
+      test('move token to contract', async () => {
+        const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
+        const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+        expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
+
+        const participantAfter = await mintableToken.balanceOf(ALICE)
+        const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+
+        expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
+        expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
+      })
+
     test('emit event', async () => {
       const tx = await plasmoid.deposit(VALUE, PLASMOID_OWNER, { from: ALICE })
       const event = tx.logs[0]
