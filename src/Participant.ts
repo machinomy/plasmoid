@@ -65,37 +65,39 @@ export class Participant {
     const digest = solUtils.keccak256(util.toBuffer('acceptCurrentState'), this.plasmaState.toBuffer())
 
     const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(this.plasmaState.channelId, this.plasmaState.amount, this.plasmaState.owner)
-    if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-      throw Error(`acceptance digests dont equals! acceptanceDigestUser = ${acceptanceDigestUser}, acceptanceDigestFromBlockchain = ${acceptanceDigestFromBlockchain}`)
-    }
-    const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
+    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(this.plasmaState.channelId, this.plasmaState.amount, this.plasmaState.owner)
+    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
+    //   throw Error(`acceptance digests dont equals! acceptanceDigestUser = ${acceptanceDigestUser}, acceptanceDigestFromBlockchain = ${acceptanceDigestFromBlockchain}`)
+    // }
+    // const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
     // console.log(acceptanceSignature)
     // console.log(acceptanceSignature.length)
+    const acceptanceSignature = ''
     return acceptanceSignature
   }
 
   async makeAcceptanceSignatureForOther (participant: Participant): Promise<string> {
     const digest = solUtils.keccak256(util.toBuffer('acceptCurrentState'), solUtils.bignumberToUint256(participant.plasmaState.channelId), solUtils.bignumberToUint256(participant.plasmaState.amount), solUtils.stringToAddress(participant.plasmaState.owner))
     const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(participant.plasmaState.channelId, participant.plasmaState.amount, participant.plasmaState.owner)
-    if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-      throw Error('acceptance digests dont equals!')
-    }
-    const acceptanceSignature = await this.sign(participant.address, acceptanceDigestUser)
+    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(participant.plasmaState.channelId, participant.plasmaState.amount, participant.plasmaState.owner)
+    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
+    //   throw Error('acceptance digests dont equals!')
+    // }
+    // const acceptanceSignature = await this.sign(participant.address, acceptanceDigestUser)
 
+    const acceptanceSignature = ''
     return acceptanceSignature
   }
 
   async makeOwnersAcceptanceSignature (checkpointId: BigNumber, ownersMerkleRoot: string): Promise<string> {
     const digest = solUtils.keccak256(util.toBuffer('acceptCurrentOwnersState'), solUtils.bignumberToUint256(checkpointId), util.toBuffer(ownersMerkleRoot))
     const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentOwnersStateDigest(checkpointId, ownersMerkleRoot)
-    if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-      throw Error('owners acceptance digests dont equals!')
-    }
-    const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
-
+    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentOwnersStateDigest(checkpointId, ownersMerkleRoot)
+    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
+    //   throw Error('owners acceptance digests dont equals!')
+    // }
+    // const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
+    const acceptanceSignature = ''
     return acceptanceSignature
   }
 
@@ -112,28 +114,30 @@ export class Participant {
     const ownersSignature =           await this.sign(this.address, ownersTreeRoot)
     const ownersAcceptanceSignature = await this.sign(this.address, ownersAcceptanceTreeRoot)
 
-    const tx = await this.plasmoidContract.checkpoint(
-      stateTreeRoot,
-      stateAcceptanceTreeRoot,
-      ownersTreeRoot,
-      ownersAcceptanceTreeRoot,
-      stateSignature + '01',
-      stateAcceptanceSignature + '01',
-      ownersSignature + '01',
-      ownersAcceptanceSignature + '01',
-      { from: this.address })
-
-    const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-    const checkpointUid: BigNumber = eventArgs.checkpointId as BigNumber
-    const checkpointObj = new Checkpoint(checkpointUid, stateTreeRoot, stateAcceptanceTreeRoot, ownersTreeRoot, ownersAcceptanceTreeRoot)
-    this.accountService.addCheckpoint(checkpointObj)
+    // const tx = await this.plasmoidContract.checkpoint(
+    //   stateTreeRoot,
+    //   stateAcceptanceTreeRoot,
+    //   ownersTreeRoot,
+    //   ownersAcceptanceTreeRoot,
+    //   stateSignature + '01',
+    //   stateAcceptanceSignature + '01',
+    //   ownersSignature + '01',
+    //   ownersAcceptanceSignature + '01',
+    //   { from: this.address })
+    //
+    // const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
+    // const checkpointUid: BigNumber = eventArgs.checkpointId as BigNumber
+    // const checkpointObj = new Checkpoint(checkpointUid, stateTreeRoot, stateAcceptanceTreeRoot, ownersTreeRoot, ownersAcceptanceTreeRoot)
+    // this.accountService.addCheckpoint(checkpointObj)
+    const tx = {} as truffle.TransactionResult
     return tx
   }
 
   async transfer (channelId: BigNumber, addressA: string, addressB: string): Promise<truffle.TransactionResult> {
-    const transferDigest = await this.plasmoidContract.transferDigest(channelId, addressB)
-    const transferSignature = await this.sign(addressA, transferDigest)
-    const tx = await this.plasmoidContract.transfer(channelId, addressB, transferSignature + '01')
+    // const transferDigest = await this.plasmoidContract.transferDigest(channelId, addressB)
+    // const transferSignature = await this.sign(addressA, transferDigest)
+    // const tx = await this.plasmoidContract.transfer(channelId, addressB, transferSignature + '01')
+    const tx = {} as truffle.TransactionResult
     return tx
   }
 
@@ -150,23 +154,25 @@ export class Participant {
     const disputeRequestSignatureAsString = util.addHexPrefix(disputeRequestSignature) + '01'
     const concatenatedOwnersProofAsString: string = solUtils.bufferArrayTo0xString(this.accountService.ownersTree!.proof(util.sha3(this.address)))
 
-    const tx = await this.plasmoidContract.startDispute(channelId, amount, this.address, disputeRequestSignatureAsString, checkpointId, concatenatedOwnersProofAsString)
+    // const tx = await this.plasmoidContract.startDispute(channelId, amount, this.address, disputeRequestSignatureAsString, checkpointId, concatenatedOwnersProofAsString)
+    const tx = {} as truffle.TransactionResult
     return tx
   }
 
 
   async answerDispute (plasmaState: PlasmaState, disputeRequestID: string, userAcceptanceSignature: string, acceptanceMerkleProof: string): Promise<truffle.TransactionResult> {
-    const tx = await this.plasmoidContract.answerDispute(plasmaState.channelId, plasmaState.amount, disputeRequestID, userAcceptanceSignature + '01', acceptanceMerkleProof)
+    // const tx = await this.plasmoidContract.answerDispute(plasmaState.channelId, plasmaState.amount, disputeRequestID, userAcceptanceSignature + '01', acceptanceMerkleProof)
+    const tx = {} as truffle.TransactionResult
     return tx
   }
 
   async finalizeDispute (disputeRequestID: string): Promise<truffle.TransactionResult> {
-    let tx
-    if (!disputeRequestID) {
-      throw Error('disputeRequestID is undefined or null')
-    } else {
-      tx = await this.plasmoidContract.finalizeDispute(disputeRequestID)
-    }
+    let tx = {} as truffle.TransactionResult
+    // if (!disputeRequestID) {
+    //   throw Error('disputeRequestID is undefined or null')
+    // } else {
+    //   tx = await this.plasmoidContract.finalizeDispute(disputeRequestID)
+    // }
 
     return tx
   }
