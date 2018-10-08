@@ -15,11 +15,13 @@ contract Plasmoid {
     uint256 public settlingPeriod = 2 days;
     uint256 public depositWithdrawalPeriod = 2 days;
     uint256 public withdrawalPeriod = 2 days;
+    uint256 public stateQueryPeriod = 2 days;
 
     uint256 depositIDNow;
     uint256 lastCheckpointID;
     uint256 withdrawalQueueIDNow;
     uint256 depositWithdrawalQueueIDNow;
+    uint256 stateQueryQueueIDNow;
 
     enum SignatureType {
         Caller, // 0x00
@@ -68,6 +70,13 @@ contract Plasmoid {
         bytes data;
     }
 
+    struct StateQueryRequest {
+        uint256 id;
+        uint256 checkpointID;
+        uint256 slotID;
+        uint256 timestamp;
+    }
+
 //    struct Transaction {
 //        mapping (uint256 => bytes32) public assetTypes;
 //    }
@@ -77,10 +86,13 @@ contract Plasmoid {
     mapping (uint256 => Deposit) public deposits;
     mapping (uint256 => Checkpoint) public checkpoints;
     mapping (address => bool) public trustedTransactionsList;
+    mapping (uint256 => StateQueryRequest) public stateQueryQueue;
 
     event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
     event DidDepositWithdraw(uint256 id, uint256 depositID, address unlock, address owner, uint256 checkpointID);
     event DidFinaliseDepositWithdraw(uint256 id);
+    event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
+    event DidResponseQueryState(uint64 id);
 
     bool halt = false;
 
@@ -90,6 +102,7 @@ contract Plasmoid {
         lastCheckpointID = 0;
         withdrawalQueueIDNow = 1;
         depositWithdrawalQueueIDNow = 1;
+        stateQueryQueueIDNow = 1;
     }
 
     function setSettlingPeriod (uint256 _settlingPeriod) public {
@@ -105,6 +118,11 @@ contract Plasmoid {
     function setWithdrawalPeriod (uint256 _withdrawalPeriod) public {
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
         withdrawalPeriod = _withdrawalPeriod;
+    }
+
+    function setStateQueryPeriod (uint256 _stateQueryPeriod) public {
+        require(_stateQueryPeriod > 0, "State query period must be > 0");
+        stateQueryPeriod = _stateQueryPeriod;
     }
 
     /// @notice User deposits funds to the contract.
@@ -169,7 +187,7 @@ contract Plasmoid {
     function challengeDepositWithdraw (uint256 _depositWithdrawalID, bytes _proof) {
         DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
         uint256 depositID = depositWithdrawalRequest.depositID;
-        Deposit _deposit = deposits[depositID];
+        Deposit storage _deposit = deposits[depositID];
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
 
         require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
@@ -188,7 +206,6 @@ contract Plasmoid {
 
         require(depositWithdrawalQueue[depositWithdrawalID].id != 0, "Deposit withdrawal request is not present");
         require(block.timestamp > depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period still proceed");
-
         require(token.transfer(owner, amount), "Can not transfer tokens to owner");
 
         delete depositWithdrawalQueue[depositWithdrawalID];
@@ -197,19 +214,35 @@ contract Plasmoid {
     }
 
     /// @notice Ask the operator for contents of the slot in the checkpoint.
+    function querySlot (uint256 checkpointID, uint64 slotID) {
+        stateQueryQueue[stateQueryQueueIDNow] = StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
 
-    function querySlot (uint64 slotID, uint256 checkpointID) {
+        emit DidQuerySlot(stateQueryQueueIDNow, checkpointID, slotID, stateQueryQueue[stateQueryQueueIDNow].timestamp);
 
+        stateQueryQueueIDNow = stateQueryQueueIDNow.add(1);
     }
 
     /// @notice The operator responds back with a proof and contents of the slot.
-    function responseQueryState (uint256 queryID, bytes proof, uint256 amount, bytes lock) {
+    function responseQueryState (uint64 _queryID, bytes _proof, uint256 _amount, bytes _lock) {
+        StateQueryRequest query = stateQueryQueue[_queryID];
+        Checkpoint checkpoint = checkpoints[query.checkpointID];
 
+//        prove(checkpoint, query.slotID, _amount, _lock, _proof);
+
+        delete stateQueryQueue[_queryID];
+
+        emit DidResponseQueryState(_queryID);
     }
 
     /// @notice If operator does not answer in timeout then make checkpoint invalid and halt.
-    function finaliseQueryState (uint64 id) {
+    function finaliseQueryState (uint64 _queryID) {
+        require(stateQueryQueue[_queryID].id != 0, "State query request does not exists");
 
+        uint256 stateQueryTimestamp = stateQueryQueue[_queryID].timestamp;
+
+        require(block.timestamp > stateQueryTimestamp + stateQueryPeriod, "State query settling period still proceed");
+
+        halt = true;
     }
 
     function queryTransaction (bytes32 txid, uint256 checkpointId) {

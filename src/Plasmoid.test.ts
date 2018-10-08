@@ -127,4 +127,18 @@ contract('Plasmoid', accounts => {
       }, 2500)
     })
   })
+
+  describe('QuerySlot', () => {
+    beforeEach(async () => { })
+
+    test('emit event', async () => {
+      const tx = await plasmoid.querySlot(new BigNumber(1), new BigNumber(2))
+      const event = tx.logs[0]
+      const eventArgs: PlasmoidWrapper.DidQuerySlot = event.args
+
+      expect(PlasmoidWrapper.isDidQuerySlotEvent(event))
+      expect(eventArgs.checkpointID.toString()).toEqual('1')
+      expect(eventArgs.slotID.toString()).toEqual('2')
+    })
+  })
 })
