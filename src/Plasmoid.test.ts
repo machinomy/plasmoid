@@ -139,7 +139,7 @@ contract('Plasmoid', accounts => {
         solUtils.bufferTo0xString(solUtils.keccak256(Buffer.from('changes'))),
         solUtils.bufferTo0xString(solUtils.keccak256(Buffer.from('accounts'))))
 
-      const checkpointID = await plasmoid.checkpointIDNow()
+      const checkpointID = 0
 
       const tx2 = await plasmoid.depositWithdraw(depositID, checkpointID, depositWithdrawSignature + '01', { from: ALICE })
       const event2 = tx2.logs[0]
@@ -154,11 +154,7 @@ contract('Plasmoid', accounts => {
       const _proofChanges = solUtils.bufferArrayTo0xString([solUtils.keccak256(Buffer.from('proof1')), solUtils.keccak256(Buffer.from('proof2'))])
       const _proofAccounts = solUtils.bufferArrayTo0xString([solUtils.keccak256(Buffer.from('proof1')), solUtils.keccak256(Buffer.from('proof2'))])
 
-      const tx3 = await plasmoid.challengeDepositWithdraw(eventArgs2.id, checkpointID, _proofTransactions, _proofChanges, _proofAccounts)
-      const event3 = tx3.logs[0]
-      const eventArgs3: PlasmoidWrapper.DidChallengeDepositWithdraw = event3.args
-      expect(PlasmoidWrapper.isDidChallengeDepositWithdrawEvent(event3))
-      expect(eventArgs3.id.toString()).toEqual('1')
+      await expect(plasmoid.challengeDepositWithdraw(eventArgs2.id, checkpointID, _proofTransactions, _proofChanges, _proofAccounts)).rejects.toBeTruthy()
     })
   })
 

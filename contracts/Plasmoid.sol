@@ -212,6 +212,7 @@ contract Plasmoid {
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
         Checkpoint storage checkpoint = checkpoints[checkpointID];
 
+        require(checkpoint.id != 0, "Checkpoint does not exists");
         require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
         require(depositWithdrawProve(_deposit.id,
                                     _deposit.amount,
