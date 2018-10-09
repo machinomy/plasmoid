@@ -17,11 +17,11 @@ contract Plasmoid {
     uint256 public withdrawalPeriod = 2 days;
     uint256 public stateQueryPeriod = 2 days;
 
-    uint256 depositIDNow;
-    uint256 lastCheckpointID;
-    uint256 withdrawalQueueIDNow;
-    uint256 depositWithdrawalQueueIDNow;
-    uint256 stateQueryQueueIDNow;
+    uint256 public depositIDNow;
+    uint256 public checkpointIDNow;
+    uint256 public withdrawalQueueIDNow;
+    uint256 public depositWithdrawalQueueIDNow;
+    uint256 public stateQueryQueueIDNow;
 
     enum SignatureType {
         Caller, // 0x00
@@ -38,7 +38,7 @@ contract Plasmoid {
     struct DepositWithdrawalRequest {
         uint256 id;
         uint256 depositID;
-        address unlock;
+        bytes unlock;
         address owner;
         uint256 checkpointID;
     }
@@ -89,20 +89,26 @@ contract Plasmoid {
     mapping (uint256 => StateQueryRequest) public stateQueryQueue;
 
     event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
-    event DidDepositWithdraw(uint256 id, uint256 depositID, address unlock, address owner, uint256 checkpointID);
+    event DidDepositWithdraw(uint256 id, uint256 depositID, bytes unlock, address owner, uint256 checkpointID);
+    event DidChallengeDepositWithdraw(uint256 id);
     event DidFinaliseDepositWithdraw(uint256 id);
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
+    event DidMakeCheckpoint(uint256 id);
 
     bool halt = false;
 
     constructor (address _tokenAddress) public {
         token = StandardToken(_tokenAddress);
         depositIDNow = 1;
-        lastCheckpointID = 0;
+        checkpointIDNow = 1;
         withdrawalQueueIDNow = 1;
         depositWithdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
+    }
+
+    function depositDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("dd", _depositID, _amount));
     }
 
     function setSettlingPeriod (uint256 _settlingPeriod) public {
@@ -125,16 +131,25 @@ contract Plasmoid {
         stateQueryPeriod = _stateQueryPeriod;
     }
 
+    function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot) public {
+        checkpoints[checkpointIDNow] = Checkpoint({ id: checkpointIDNow,
+                                                    transactionsMerkleRoot: _transactionsMerkleRoot,
+                                                    changesSparseMerkleRoot: _changesSparseMerkleRoot,
+                                                    accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
+                                                    valid: true });
+        emit DidMakeCheckpoint(checkpointIDNow);
+    }
+
     /// @notice User deposits funds to the contract.
     /// @notice Add an entry to Deposits list, increase Deposit Counter.
     /// @notice Future: Use an asset manager to transfer the asset into the contract.
     /// @param _amount Amount of asset
-    /// @param _owner lock
-    function deposit(uint256 _amount, address _owner) public {
+    function deposit(uint256 _amount) public {
         require(_amount > 0, "Can not deposit 0");
         require(token.transferFrom(msg.sender, address(this), _amount));
-        deposits[depositIDNow] = Deposit({ id: depositIDNow, amount: _amount, lock: _owner, timestamp: block.timestamp });
-        emit DidDeposit(depositIDNow, _amount, _owner, deposits[depositIDNow].timestamp);
+        deposits[depositIDNow] = Deposit({ id: depositIDNow, amount: _amount, lock: msg.sender, timestamp: block.timestamp });
+
+        emit DidDeposit(depositIDNow, _amount, msg.sender, deposits[depositIDNow].timestamp);
 
         depositIDNow = depositIDNow.add(1);
     }
@@ -171,34 +186,51 @@ contract Plasmoid {
 
     /// @notice Initiate withdrawal from the deposit that has not been included in to a checkpoint.
     /// @param _depositID depositID
-    /// @param _unlock unlock
-    function depositWithdraw (uint256 _depositID, address _unlock) public {
+    /// @param _unlock Signature of depositDigest (uint256 _depositID, uint256 _amount)
+    function depositWithdraw (uint256 _depositID, uint256 _checkpointID, bytes _unlock) public {
+        Deposit storage depo = deposits[_depositID];
+        bytes32 depositWithdrawHash = depositDigest(depo.id, depo.amount);
+
+        require(isValidSignature(depositWithdrawHash, msg.sender, _unlock), "Signature is not valid");
+
         depositWithdrawalQueue[depositWithdrawalQueueIDNow] = DepositWithdrawalRequest({    id: depositWithdrawalQueueIDNow,
                                                                                             depositID: _depositID,
                                                                                             unlock: _unlock,
                                                                                             owner: msg.sender,
-                                                                                            checkpointID: 0 });
-        emit DidDepositWithdraw(depositWithdrawalQueueIDNow, _depositID, _unlock, msg.sender, depositWithdrawalQueue[depositWithdrawalQueueIDNow].checkpointID);
+                                                                                            checkpointID: _checkpointID });
+
+        emit DidDepositWithdraw(depositWithdrawalQueueIDNow, _depositID, _unlock, msg.sender, _checkpointID);
 
         depositWithdrawalQueueIDNow = depositWithdrawalQueueIDNow.add(1);
     }
 
     /// @notice Challenge the withdrawal request by showing that the deposit is included into the current checkpoint.
-    function challengeDepositWithdraw (uint256 _depositWithdrawalID, bytes _proof) {
+    function challengeDepositWithdraw (uint256 _depositWithdrawalID, uint256 checkpointID, bytes _proofTransactions, bytes _proofChanges, bytes _proofAccounts) public {
         DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
         uint256 depositID = depositWithdrawalRequest.depositID;
         Deposit storage _deposit = deposits[depositID];
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
+        Checkpoint storage checkpoint = checkpoints[checkpointID];
 
         require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
-
-//        prove(_deposit.amount, _deposit.lock, _deposit.unlock, checkpoint, _proof);
+        require(depositWithdrawProve(_deposit.id,
+                                    _deposit.amount,
+                                    _deposit.lock,
+                                    depositWithdrawalRequest.unlock,
+                                    checkpoint.transactionsMerkleRoot,
+                                    checkpoint.changesSparseMerkleRoot,
+                                    checkpoint.accountsStateSparseMerkleRoot,
+                                    _proofTransactions,
+                                    _proofChanges,
+                                    _proofAccounts), "Deposit withdraw is not in checkpoint");
 
         delete depositWithdrawalQueue[_depositWithdrawalID];
+
+        emit DidChallengeDepositWithdraw(_depositWithdrawalID);
     }
 
     /// @notice If the withdraw attempt has not been challenged during timeout, process with the withdrawal.
-    function finaliseDepositWithdraw (uint256 depositWithdrawalID) {
+    function finaliseDepositWithdraw (uint256 depositWithdrawalID) public {
         uint256 depositID = depositWithdrawalQueue[depositWithdrawalID].depositID;
         uint256 depositWithdrawalTimestamp = deposits[depositID].timestamp;
         address owner = depositWithdrawalQueue[depositWithdrawalID].owner;
@@ -213,6 +245,25 @@ contract Plasmoid {
         emit DidFinaliseDepositWithdraw(depositWithdrawalID);
     }
 
+    function depositWithdrawProve ( uint256 _depositID,
+                                    uint256 _amount,
+                                    address _lock,
+                                    bytes _unlock,
+                                    bytes32 _checkpointTransactionsMerkleRoot,
+                                    bytes32 _checkpointChangesSparseMerkleRoot,
+                                    bytes32 _checkpointAccountsStateSparseMerkleRoot,
+                                    bytes _proofTransactions,
+                                    bytes _proofChanges,
+                                    bytes _proofAccounts) public returns (bool){
+        bytes32 digest = depositDigest(_depositID, _amount);
+//        if (isValidSignature(digest, _lock, _unlock)) {
+//            return true;
+//        }
+
+        return true;
+
+    }
+
     /// @notice Ask the operator for contents of the slot in the checkpoint.
     function querySlot (uint256 checkpointID, uint64 slotID) {
         stateQueryQueue[stateQueryQueueIDNow] = StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
@@ -224,8 +275,8 @@ contract Plasmoid {
 
     /// @notice The operator responds back with a proof and contents of the slot.
     function responseQueryState (uint64 _queryID, bytes _proof, uint256 _amount, bytes _lock) {
-        StateQueryRequest query = stateQueryQueue[_queryID];
-        Checkpoint checkpoint = checkpoints[query.checkpointID];
+        StateQueryRequest storage query = stateQueryQueue[_queryID];
+        Checkpoint storage checkpoint = checkpoints[query.checkpointID];
 
 //        prove(checkpoint, query.slotID, _amount, _lock, _proof);
 
