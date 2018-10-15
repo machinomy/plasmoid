@@ -5,20 +5,20 @@ import * as solUtils from './SolidityUtils'
 const numberToBN = require('number-to-bn')
 
 export class PlasmaState {
-  channelId: BigNumber
+  slotID: BigNumber
   amount: BigNumber
   owner: string
 
-  constructor (channelId: BigNumber | undefined, amount: BigNumber | undefined, owner: string | undefined) {
-    this.channelId = channelId ? channelId : new BigNumber(-1)
+  constructor (slotID: BigNumber | undefined, amount: BigNumber | undefined, owner: string | undefined) {
+    this.slotID = slotID ? slotID : new BigNumber(-1)
     this.amount = amount ? amount : new BigNumber(-1)
     this.owner = owner ? owner : ''
   }
 
   toBuffer (): Buffer {
-    const channelIdBuffer = solUtils.bignumberToUint256(this.channelId)
+    const slotIDBuffer = solUtils.bignumberToUint256(this.slotID)
     const amountBuffer = solUtils.bignumberToUint256(this.amount)
     const ownerBuffer = solUtils.stringToAddress(this.owner)
-    return Buffer.concat([channelIdBuffer, amountBuffer, ownerBuffer])
+    return Buffer.concat([slotIDBuffer, amountBuffer, ownerBuffer])
   }
 }

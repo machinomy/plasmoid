@@ -3,10 +3,11 @@ pragma solidity ^0.4.24;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./LibBytes.sol";
 
 
-contract Plasmoid {
+contract Plasmoid is Ownable {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
@@ -16,23 +17,33 @@ contract Plasmoid {
     uint256 public depositWithdrawalPeriod = 2 days;
     uint256 public withdrawalPeriod = 2 days;
     uint256 public stateQueryPeriod = 2 days;
+    uint256 public fastWithdrawalPeriod = 2 days;
 
     uint256 public depositIDNow;
     uint256 public checkpointIDNow;
     uint256 public withdrawalQueueIDNow;
     uint256 public depositWithdrawalQueueIDNow;
     uint256 public stateQueryQueueIDNow;
+    uint256 public fastWithdrawalIDNow;
 
     enum SignatureType {
         Caller, // 0x00
         EthSign // 0x01
     }
 
-    struct WithdrawalRequest {
+    struct Deposit {
         uint256 id;
         uint256 amount;
-        address unlock;
+        address lock;
+        uint256 timestamp;
+    }
+
+    struct WithdrawalRequest {
+        uint256 id;
         uint256 checkpointID;
+        uint256 amount;
+        address lock;
+        uint256 timestamp;
     }
 
     struct DepositWithdrawalRequest {
@@ -41,13 +52,6 @@ contract Plasmoid {
         bytes unlock;
         address owner;
         uint256 checkpointID;
-    }
-
-    struct Deposit {
-        uint256 id;
-        uint256 amount;
-        address lock;
-        uint256 timestamp;
     }
 
     struct Checkpoint {
@@ -77,6 +81,20 @@ contract Plasmoid {
         uint256 timestamp;
     }
 
+    struct FastWithdrawal {
+        uint256 id;
+        bytes32 slotHash;
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+    struct Transaction {
+        uint256 id;
+        uint256 checkpointID;
+        uint256 txID;
+        uint256 timestamp;
+    }
+
 //    struct Transaction {
 //        mapping (uint256 => bytes32) public assetTypes;
 //    }
@@ -87,6 +105,8 @@ contract Plasmoid {
     mapping (uint256 => Checkpoint) public checkpoints;
     mapping (address => bool) public trustedTransactionsList;
     mapping (uint256 => StateQueryRequest) public stateQueryQueue;
+    mapping (uint256 => FastWithdrawal) public fastWithdrawals;
+    mapping (uint256 => Transaction) public transactions;
 
     event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
     event DidDepositWithdraw(uint256 id, uint256 depositID, bytes unlock, address owner, uint256 checkpointID);
@@ -95,20 +115,37 @@ contract Plasmoid {
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
     event DidMakeCheckpoint(uint256 id);
+    event DidStartFastWithdrawal(uint256 id, bytes32 slotHash, uint256 amount, uint256 timestamp);
+    event DidFinaliseFastWithdrawal(uint256 id);
+    event DidStartWithdrawal(uint256 id, uint256 checkpointID, uint256 amount, address lock, bytes unlock, uint256 timestamp);
+    event DidFinaliseWithdrawal(uint256 id);
 
     bool halt = false;
 
-    constructor (address _tokenAddress) public {
+    constructor (address _tokenAddress) public Ownable() {
         token = StandardToken(_tokenAddress);
         depositIDNow = 1;
         checkpointIDNow = 1;
         withdrawalQueueIDNow = 1;
         depositWithdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
+        fastWithdrawalIDNow = 1;
     }
 
     function depositDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
         return keccak256(abi.encodePacked("dd", _depositID, _amount));
+    }
+
+    function depositTransactionDigest (uint256 _amount, address _destination) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("01", _amount, _destination));
+    }
+
+    function withdrawalDigest (uint64 _slotID, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("w", _slotID, _amount));
+    }
+
+    function accountsDigest (uint256 _amount, address _owner) public view returns (bytes32) {
+        return keccak256(abi.encodePacked(_amount, _owner));
     }
 
     function setSettlingPeriod (uint256 _settlingPeriod) public {
@@ -131,7 +168,9 @@ contract Plasmoid {
         stateQueryPeriod = _stateQueryPeriod;
     }
 
-    function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot) public {
+    function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
+        bytes32 hash = keccak256(abi.encodePacked(_transactionsMerkleRoot, _changesSparseMerkleRoot, _accountsStateSparseMerkleRoot));
+        require(isValidSignature(hash, owner, signature), "Signature is not valid");
         checkpoints[checkpointIDNow] = Checkpoint({ id: checkpointIDNow,
                                                     transactionsMerkleRoot: _transactionsMerkleRoot,
                                                     changesSparseMerkleRoot: _changesSparseMerkleRoot,
@@ -146,7 +185,8 @@ contract Plasmoid {
     /// @param _amount Amount of asset
     function deposit(uint256 _amount) public {
         require(_amount > 0, "Can not deposit 0");
-        require(token.transferFrom(msg.sender, address(this), _amount));
+        require(token.transferFrom(msg.sender, address(this), _amount), "Can not transfer");
+
         deposits[depositIDNow] = Deposit({ id: depositIDNow, amount: _amount, lock: msg.sender, timestamp: block.timestamp });
 
         emit DidDeposit(depositIDNow, _amount, msg.sender, deposits[depositIDNow].timestamp);
@@ -156,32 +196,41 @@ contract Plasmoid {
 
     /// @notice Initiate withdrawal from the contract.
     /// @notice Validate the slot is in the current checkpoint, add the request to a withdrawQueue.
-    /// @param id id
-    /// @param amount amount
-    /// @param lock lock
-    /// @param proof proof
-    /// @param unlock unlock
-    function startWithdraw (uint64 id, uint256 amount, bytes lock, bytes proof, bytes unlock) {
-//        withdrawalQueue[withdrawalQueueIDNow] = new WithdrawalRequest(checkpoint, id, amount, lock, unlock, settlingPeriod);
+    /// @param _checkpointID checkpointID
+    /// @param _amount amount
+    /// @param _lock lock
+    /// @param _proof proof
+    /// @param _unlock unlock
+    function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) {
+        bytes32 hash = keccak256(abi.encodePacked("w", _slotID, _amount));
+        require(isValidSignature(hash, _lock, _unlock), "Signature is not valid");
+        withdrawalQueue[withdrawalQueueIDNow] = WithdrawalRequest({ id: withdrawalQueueIDNow, checkpointID: _checkpointID, amount: _amount, lock: _lock, timestamp: block.timestamp });
+
+        emit DidStartWithdrawal(withdrawalQueueIDNow, _checkpointID, _amount, _lock, _unlock, withdrawalQueue[withdrawalQueueIDNow].timestamp);
+
         withdrawalQueueIDNow = withdrawalQueueIDNow.add(1);
     }
 
     /// @notice Remove withdrawal attempt if the checkpoint is invalid.
     /// @param withdrawalID Withdrawal ID
-    function challengeWithdraw (uint256 withdrawalID) {
+    function revokeWithdrawal (uint256 withdrawalID) {
         WithdrawalRequest storage withdrawalRequest = withdrawalQueue[withdrawalID];
 //        require(withdrawalRequest block.timestamp);
     }
 
     /// @notice If the withdrawal has not been challenged during a withdrawal window, one could freely exit the contract.
     /// @param withdrawalID Withdrawal ID
-    function finishWithdraw (uint256 withdrawalID) {
+    function finaliseWithdrawal (uint256 withdrawalID) {
         WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
+        require(withdrawalRequest.id != 0, "Withdrawal request is not exists");
         uint256 checkpointID = withdrawalRequest.checkpointID;
         Checkpoint storage checkpoint = checkpoints[checkpointID];
         uint256 amount = withdrawalRequest.amount;
+        address owner = withdrawalRequest.lock;
         require(checkpoint.valid == true, "Checkpoint is not valid");
-//        require(token.transfer(owner, amount), "Can not transfer tokens to owner");
+        require(token.transfer(owner, amount), "Can not transfer tokens to owner");
+
+        emit DidFinaliseWithdrawal(withdrawalID);
     }
 
     /// @notice Initiate withdrawal from the deposit that has not been included in to a checkpoint.
@@ -298,7 +347,7 @@ contract Plasmoid {
     }
 
     function queryTransaction (bytes32 txid, uint256 checkpointId) {
-
+//        txQuery += (id, checkpointId, txid, timeout)
     }
 
     function responseQueryTransaction(uint256 queryId, uint64[] ids, address txResolver, bytes unlock, bytes proof) {
@@ -325,12 +374,30 @@ contract Plasmoid {
 
     }
 
-    function startFastWithdrawal(bytes32 slotHash, uint256 amount) {
+    function startFastWithdrawal(bytes32 _slotHash, uint256 _amount) {
+        fastWithdrawals[fastWithdrawalIDNow] = FastWithdrawal({ id: fastWithdrawalIDNow, slotHash: _slotHash, amount: _amount, timestamp: block.timestamp });
 
+        emit DidStartFastWithdrawal(fastWithdrawalIDNow, _slotHash, _amount, fastWithdrawals[fastWithdrawalIDNow].timestamp);
+
+        fastWithdrawalIDNow = fastWithdrawalIDNow.add(1);
     }
 
-    function finishFastWithdraw(uint256 fwId, bytes transaction, bytes32 currentSlot, bytes clientSignature) {
-
+    function finishFastWithdrawal(uint256 fastWithdrawalID, bytes transaction, bytes32 currentSlot, bytes clientSignature) {
+//        FastWithdrawal storage fastWithdrawal = fastWithdrawals[fastWithdrawalID];
+//        uint256 fastWithdrawalTimestamp = fastWithdrawal.timestamp;
+//        require(fastWithdrawal.id != 0, "Fast Withdrawal is not present");
+//
+//        newSlot = applyTransaction(currentSlot, transaction);
+//        if (block.timestamp > fastWithdrawalTimestamp + fastWithdrawalPeriod) {
+//            delete fastWithdrawals[fastWithdrawalID];
+//            return;
+//        }
+//        require(newSlot == fastWithdrawal.slotHash, "Slot hash does not match");
+//        //        unlockAddress = ecrecover(, fwI)
+////        require(require(slot.canUnlock(unlockAddress)), "");
+//        require(token.transfer(owner, fastWithdrawal.amount), "Can not transfer tokens to client");
+//
+//        emit DidFinaliseFastWithdrawal(fastWithdrawalID);
     }
 
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {

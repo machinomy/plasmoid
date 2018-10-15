@@ -10,10 +10,18 @@ export type Bytes32 = Buffer
 export type Address = Buffer
 
 export function bignumberToUint256 (n: BigNumber): Uint256 {
+  return bignumberToBuffer(n)
+}
+
+export function bignumberToBuffer (n: BigNumber): Buffer {
   return util.setLengthLeft((util.toBuffer(numberToBN(n))), 32)
 }
 
 export function stringToBytes (str: string): Bytes {
+  return stringToBuffer(str)
+}
+
+export function stringToBuffer (str: string): Bytes {
   return util.toBuffer(str)
 }
 
@@ -31,6 +39,10 @@ export function bufferArrayTo0xString (bufferArray: Buffer[]): string {
 
 export function keccak256 (...args: Buffer[]): Bytes32 {
   return util.sha3(Buffer.concat(args))
+}
+
+export function keccak256FromStrings (...args: string[]): Bytes32 {
+  return util.sha3(stringToBytes(args.join('')))
 }
 
 export function bytes32To0xString (input: Bytes32): string {

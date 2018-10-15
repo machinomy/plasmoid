@@ -3,6 +3,7 @@ import { BigNumber } from 'bignumber.js'
 import { Buffer } from 'safe-buffer'
 import * as util from "ethereumjs-util"
 import PlasmoidWrapper from '../build/wrappers/Plasmoid'
+import { DepositTransaction } from './DepositTransaction'
 import * as contracts from './index'
 import * as truffle from 'truffle-contract'
 import { Checkpoint} from './Checkpoint'
@@ -22,30 +23,27 @@ export class Participant {
   plasmaState: PlasmaState
   accountService: AccountService
 
-  constructor (address: string, plasmoidContract: contracts.Plasmoid.Contract, accountingService: AccountService, channelId?: BigNumber, amount?: BigNumber) {
-    this.address = address
+  constructor (address: string, plasmoidContract: contracts.Plasmoid.Contract, accountingService: AccountService, amount?: BigNumber) {
+    this.address = address.toLowerCase()
     this.plasmoidContract = plasmoidContract
-    this.plasmaState = new PlasmaState(channelId, amount, address)
+    this.plasmaState = new PlasmaState(new BigNumber(0), amount, address)
     this.accountService = accountingService
-  }
-
-  setChannel (channelId: BigNumber) {
-    this.plasmaState.channelId = channelId
   }
 
   setAmount (amount: BigNumber) {
     this.plasmaState.amount = amount
   }
 
-  setOwner (owner: string) {
-    this.plasmaState.owner = owner
+  setAddress (address: string) {
+    this.address = address
+    this.plasmaState.owner = address
   }
 
-  async sign (address: string, data: string | Buffer): Promise<string> {
+  async sign (data: string | Buffer): Promise<string> {
     if (data instanceof Buffer) {
       data = data.toString('hex')
     }
-    let result = await web3.eth.sign(address, data)
+    let result = await web3.eth.sign(this.address, data)
     // result += '01'
     return result
   }
@@ -61,75 +59,76 @@ export class Participant {
     return digest
   }
 
-  async makeAcceptanceSignature (): Promise<string> {
-    const digest = solUtils.keccak256(util.toBuffer('acceptCurrentState'), this.plasmaState.toBuffer())
+  // async makeDeposit (): Promise<string> {
+  //   const digest = solUtils.keccak256(util.toBuffer('acceptCurrentState'), this.plasmaState.toBuffer())
+  //
+  //   const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
+  //   // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(this.plasmaState.channelId, this.plasmaState.amount, this.plasmaState.owner)
+  //   // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
+  //   //   throw Error(`acceptance digests dont equals! acceptanceDigestUser = ${acceptanceDigestUser}, acceptanceDigestFromBlockchain = ${acceptanceDigestFromBlockchain}`)
+  //   // }
+  //   // const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
+  //   // console.log(acceptanceSignature)
+  //   // console.log(acceptanceSignature.length)
+  //   const acceptanceSignature = ''
+  //   return acceptanceSignature
+  // }
 
-    const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(this.plasmaState.channelId, this.plasmaState.amount, this.plasmaState.owner)
-    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-    //   throw Error(`acceptance digests dont equals! acceptanceDigestUser = ${acceptanceDigestUser}, acceptanceDigestFromBlockchain = ${acceptanceDigestFromBlockchain}`)
-    // }
-    // const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
-    // console.log(acceptanceSignature)
-    // console.log(acceptanceSignature.length)
-    const acceptanceSignature = ''
-    return acceptanceSignature
+  async deposit (amount: BigNumber): Promise<truffle.TransactionResult> {
+    const tx = await this.plasmoidContract.deposit(amount, { from: this.address })
+    const depositTx = new DepositTransaction(this.address, amount)
+    this.accountService.deposits.push(depositTx)
+    return tx
   }
 
-  async makeAcceptanceSignatureForOther (participant: Participant): Promise<string> {
-    const digest = solUtils.keccak256(util.toBuffer('acceptCurrentState'), solUtils.bignumberToUint256(participant.plasmaState.channelId), solUtils.bignumberToUint256(participant.plasmaState.amount), solUtils.stringToAddress(participant.plasmaState.owner))
-    const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentStateDigest(participant.plasmaState.channelId, participant.plasmaState.amount, participant.plasmaState.owner)
-    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-    //   throw Error('acceptance digests dont equals!')
-    // }
-    // const acceptanceSignature = await this.sign(participant.address, acceptanceDigestUser)
-
-    const acceptanceSignature = ''
-    return acceptanceSignature
+  async startWithdrawal (checkpointID: BigNumber, slotID: BigNumber, amount: BigNumber, lock: string, proof: string, unlock: string,): Promise<truffle.TransactionResult> {
+    const tx = await this.plasmoidContract.startWithdrawal(checkpointID, slotID, amount, lock, proof, unlock, { from: this.address })
+    return tx
   }
 
-  async makeOwnersAcceptanceSignature (checkpointId: BigNumber, ownersMerkleRoot: string): Promise<string> {
-    const digest = solUtils.keccak256(util.toBuffer('acceptCurrentOwnersState'), solUtils.bignumberToUint256(checkpointId), util.toBuffer(ownersMerkleRoot))
-    const acceptanceDigestUser: string = solUtils.bytes32To0xString(digest)
-    // const acceptanceDigestFromBlockchain: string = await this.plasmoidContract.acceptCurrentOwnersStateDigest(checkpointId, ownersMerkleRoot)
-    // if (acceptanceDigestUser !== acceptanceDigestFromBlockchain) {
-    //   throw Error('owners acceptance digests dont equals!')
-    // }
-    // const acceptanceSignature = await this.sign(this.address, acceptanceDigestUser)
-    const acceptanceSignature = ''
-    return acceptanceSignature
+  async finaliseWithdrawal (withdrawalID: BigNumber): Promise<truffle.TransactionResult> {
+    const tx = await this.plasmoidContract.finaliseWithdrawal(withdrawalID)
+    return tx
+  }
+
+  makeDepositDigest (): Buffer {
+    const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
+    const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
+    return Buffer.concat([solUtils.stringToBytes('d'), slotIDBuffer, amountBuffer])
+  }
+
+  makeWithdrawalDigest (): Buffer {
+    const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
+    const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
+    return Buffer.concat([solUtils.stringToBytes('w'), slotIDBuffer, amountBuffer])
   }
 
   async makeCheckpoint (): Promise<truffle.TransactionResult> {
+
     await this.accountService.updateTrees()
 
-    const stateTreeRoot =             this.accountService.stateTreeRoot()
-    const stateAcceptanceTreeRoot =   this.accountService.stateAcceptanceTreeRoot()
-    const ownersTreeRoot =            this.accountService.ownersTreeRoot()
-    const ownersAcceptanceTreeRoot =  this.accountService.ownersAcceptanceTreeRoot()
+    const txMerkleRoot = this.accountService.txMerkleRoot()
+    const changesMerkleRoot = this.accountService.changesMerkleRoot()
+    const accountsMerkleRoot = this.accountService.accountsMerkleRoot()
 
-    const stateSignature =            await this.sign(this.address, stateTreeRoot)
-    const stateAcceptanceSignature =  await this.sign(this.address, stateAcceptanceTreeRoot)
-    const ownersSignature =           await this.sign(this.address, ownersTreeRoot)
-    const ownersAcceptanceSignature = await this.sign(this.address, ownersAcceptanceTreeRoot)
+    const checkpointSignature = await this.sign(solUtils.keccak256FromStrings(txMerkleRoot, changesMerkleRoot, accountsMerkleRoot))
 
-    // const tx = await this.plasmoidContract.checkpoint(
-    //   stateTreeRoot,
-    //   stateAcceptanceTreeRoot,
-    //   ownersTreeRoot,
-    //   ownersAcceptanceTreeRoot,
-    //   stateSignature + '01',
-    //   stateAcceptanceSignature + '01',
-    //   ownersSignature + '01',
-    //   ownersAcceptanceSignature + '01',
-    //   { from: this.address })
-    //
-    // const eventArgs: PlasmoidWrapper.DidCheckpoint = tx.logs[0].args
-    // const checkpointUid: BigNumber = eventArgs.checkpointId as BigNumber
-    // const checkpointObj = new Checkpoint(checkpointUid, stateTreeRoot, stateAcceptanceTreeRoot, ownersTreeRoot, ownersAcceptanceTreeRoot)
-    // this.accountService.addCheckpoint(checkpointObj)
-    const tx = {} as truffle.TransactionResult
+    console.log(`txMerkleRoot = ${txMerkleRoot}`)
+    console.log(`changesMerkleRoot = ${changesMerkleRoot}`)
+    console.log(`accountsMerkleRoot = ${accountsMerkleRoot}`)
+
+    const tx = await this.plasmoidContract.makeCheckpoint(
+      txMerkleRoot,
+      changesMerkleRoot,
+      accountsMerkleRoot,
+      checkpointSignature,
+      { from: this.address })
+
+    const eventArgs: PlasmoidWrapper.DidMakeCheckpoint = tx.logs[0].args
+    const checkpointUid: BigNumber = eventArgs.id as BigNumber
+    const checkpointObj = new Checkpoint(checkpointUid, txMerkleRoot, changesMerkleRoot, accountsMerkleRoot)
+    this.accountService.addCheckpoint(checkpointObj)
+    // const tx = {} as truffle.TransactionResult
     return tx
   }
 
@@ -142,17 +141,17 @@ export class Participant {
   }
 
   async startDispute (channelId: BigNumber, amount: BigNumber, checkpointId: BigNumber): Promise<truffle.TransactionResult> {
-    await this.accountService.updateTrees()
-    const channelIdAsBuffer = solUtils.bignumberToUint256(channelId)
-    const amountAsBuffer = solUtils.bignumberToUint256(amount)
-    const ownerAsBuffer = solUtils.stringToAddress(this.address)
-    const checkpointIdAsBuffer = solUtils.bignumberToUint256(checkpointId)
-
-    const disputeRequestDigest = solUtils.keccak256(channelIdAsBuffer, amountAsBuffer, ownerAsBuffer, checkpointIdAsBuffer)
-    // console.log(`disputeRequestDigest = ${solUtils.bufferTo0xString(disputeRequestDigest)}`)
-    const disputeRequestSignature = await this.sign(this.address, disputeRequestDigest)
-    const disputeRequestSignatureAsString = util.addHexPrefix(disputeRequestSignature) + '01'
-    const concatenatedOwnersProofAsString: string = solUtils.bufferArrayTo0xString(this.accountService.ownersTree!.proof(util.sha3(this.address)))
+    // await this.accountService.updateTrees()
+    // const channelIdAsBuffer = solUtils.bignumberToUint256(channelId)
+    // const amountAsBuffer = solUtils.bignumberToUint256(amount)
+    // const ownerAsBuffer = solUtils.stringToAddress(this.address)
+    // const checkpointIdAsBuffer = solUtils.bignumberToUint256(checkpointId)
+    //
+    // const disputeRequestDigest = solUtils.keccak256(channelIdAsBuffer, amountAsBuffer, ownerAsBuffer, checkpointIdAsBuffer)
+    // // console.log(`disputeRequestDigest = ${solUtils.bufferTo0xString(disputeRequestDigest)}`)
+    // const disputeRequestSignature = await this.sign(disputeRequestDigest)
+    // const disputeRequestSignatureAsString = util.addHexPrefix(disputeRequestSignature) + '01'
+    // const concatenatedOwnersProofAsString: string = solUtils.bufferArrayTo0xString(this.accountService.ownersTree!.proof(util.sha3(this.address)))
 
     // const tx = await this.plasmoidContract.startDispute(channelId, amount, this.address, disputeRequestSignatureAsString, checkpointId, concatenatedOwnersProofAsString)
     const tx = {} as truffle.TransactionResult
@@ -176,5 +175,4 @@ export class Participant {
 
     return tx
   }
-
 }

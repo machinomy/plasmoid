@@ -2,16 +2,14 @@ import { BigNumber } from 'bignumber.js'
 
 export class Checkpoint {
   id: BigNumber
-  stateTreeRoot: string
-  stateAcceptanceTreeRoot: string
-  ownersTreeRoot: string
-  ownersAcceptanceTreeRoot: string
+  txMerkleRoot: string
+  changesMerkleRoot: string
+  accountsMerkleRoot: string
 
-  constructor (id: BigNumber, stateTreeRoot: string, stateAcceptanceTreeRoot: string, ownersTreeRoot: string, ownersAcceptanceTreeRoot: string ) {
+  constructor (id: BigNumber, txMerkleRoot: string, changesMerkleRoot: string, accountsMerkleRoot: string) {
     this.id = id
-    this.stateTreeRoot = stateTreeRoot
-    this.stateAcceptanceTreeRoot = stateAcceptanceTreeRoot
-    this.ownersTreeRoot = ownersTreeRoot
-    this.ownersAcceptanceTreeRoot = ownersAcceptanceTreeRoot
+    this.txMerkleRoot = txMerkleRoot
+    this.changesMerkleRoot = changesMerkleRoot
+    this.accountsMerkleRoot = accountsMerkleRoot
   }
 }
