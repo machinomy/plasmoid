@@ -17,6 +17,7 @@ const ethSigUtil = require('eth-sig-util')
 
 const Plasmoid = artifacts.require<contracts.Plasmoid.Contract>('Plasmoid.sol')
 const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
+const LibService = artifacts.require('LibService.sol')
 
 const MINTED = new BigNumber(1000)
 const VALUE = new BigNumber(100)
@@ -27,6 +28,7 @@ const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
 
 let accountsState: Map<string, PlasmaState> = new Map()
 
+Plasmoid.link(LibService)
 
 contract('Plasmoid', accounts => {
   const TOKEN_OWNER: string = accounts[0]
@@ -94,8 +96,15 @@ contract('Plasmoid', accounts => {
   describe('TestCheckpoint', () => {
 
     beforeEach(async () => {
+      const settlementPeriod: BigNumber = new BigNumber(2 * 24 * 60 * 60)
+
       mintableToken = await MintableToken.new({ from: TOKEN_OWNER })
-      plasmoid = await Plasmoid.new(mintableToken.address, { from: PLASMOID_OWNER })
+      plasmoid = await Plasmoid.new(mintableToken.address,
+                                    settlementPeriod,
+                                    settlementPeriod,
+                                    settlementPeriod,
+                                    settlementPeriod,
+                                    { from: PLASMOID_OWNER })
 
       await mintableToken.mint(ALICE, MINTED, { from: TOKEN_OWNER })
       await mintableToken.finishMinting({ from: TOKEN_OWNER })
@@ -149,6 +158,16 @@ contract('Plasmoid', accounts => {
       PlasmoidWrapper.printEvents(txDeposit)
 
       accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
+
+      accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
+
+      accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
+
+      accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE)
+
+      accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE)
+
+      accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE)
 
       // Operator makes checkpoint
       const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()

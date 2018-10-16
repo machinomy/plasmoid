@@ -18,9 +18,9 @@ export class AccountService {
   participants:         Array<Participant>
   txArray:              Array<Transaction>
   txTree:               MerkleTree | undefined
-  changes:              Map<BigNumber, BigNumber | undefined> | undefined
+  changes:              Map<string, BigNumber>
   changesTree:          MerkleTree | undefined
-  accounts:             Map<BigNumber, string>
+  accounts:             Map<string, string>
   accountsTree:         MerkleTree | undefined
   checkpointIdNext:     BigNumber
   plasmoidContract:     contracts.Plasmoid.Contract
@@ -36,16 +36,19 @@ export class AccountService {
     this.checkpoints = new Map()
     this.checkpointIdNext = new BigNumber(2)
     this.plasmoidContract = plasmoidContract
-    this.participantAddress = participantAddress
+    this.participantAddress = participantAddress.toLowerCase()
   }
 
   sync () {
-    this.participants.map((party: Participant) => {
+    for (let party of this.participants) {
       if (party.address !== this.participantAddress) {
-        party.accountService.changes = JSON.parse(JSON.stringify(this.changes))
+        party.accountService.changes = new Map(this.changes)
+        party.accountService.accounts = new Map(this.accounts)
+        party.accountService.txArray = JSON.parse(JSON.stringify(this.txArray))
       }
-    })
+    }
   }
+
 
   addParticipant (participant: Participant): Participant {
     this.participants.push(participant)
@@ -64,13 +67,14 @@ export class AccountService {
     return withdrawalTransaction
   }
 
-  addChange (slotId: BigNumber, txId: BigNumber | undefined): void {
-    this.changes!.set(slotId, txId)
+  addChange (slotId: BigNumber, txId: BigNumber): void {
+    this.changes!.set(slotId.toString(), txId)
     this.sync()
   }
 
   addAccountChange (slotId: BigNumber, account: string): void {
-    this.accounts!.set(slotId, account)
+    this.accounts.set(slotId.toString(), account.toLowerCase())
+    this.sync()
   }
 
   getParticipantByAddress (address: string): Participant | undefined {
@@ -91,6 +95,9 @@ export class AccountService {
       return solUtils.keccak256(solUtils.stringToAddress(party.address), solUtils.bignumberToUint256(party.plasmaState.amount))
     })
 
+    console.log('txArray: ')
+    console.log(txArray)
+
     this.txTree = new MerkleTree(txArray)
 
     const changesArray: Buffer[] = []
@@ -99,12 +106,10 @@ export class AccountService {
     //   changesArray.push(solUtils.bignumberToBuffer(value || new BigNumber(0)))
     // })
 
-    console.log('Changes: ')
-    console.log(JSON.stringify(this.changes))
-
-    if (this.changes) {
-      for (let key of this.changes!.keys()) {
-        changesArray.push(solUtils.bignumberToBuffer(this.changes!.get(key) || new BigNumber(0)))
+    if (this.changes.size) {
+      for (let key of this.changes.keys()) {
+        // console.log(`Let I: ${this.changes!.get(key)}`)
+        changesArray.push(solUtils.bignumberToBuffer(new BigNumber(this.changes!.get(key) || 0)))
       }
     }
 
@@ -112,40 +117,18 @@ export class AccountService {
 
     const accountsArray: Buffer[] = []
 
-    console.log('Accounts: ')
-    console.log(JSON.stringify(this.accounts))
+    // console.log('Accounts: ')
+    // console.log(JSON.stringify(this.accounts))
 
-    if (this.accounts) {
+    if (this.accounts.size) {
+      console.log(JSON.stringify(this.accounts))
       for (let key of this.accounts.keys()) {
-        accountsArray.push(solUtils.stringToBuffer(this.accounts!.get(key)!))
+        accountsArray.push(solUtils.stringToBuffer(this.accounts.get(key) || '0x'))
       }
     }
 
+    console.log(JSON.stringify(accountsArray))
     this.accountsTree = new MerkleTree(accountsArray)
-
-    // /// ??? TODO .toBuffer
-    // // const stateMerkleRoot: string = util.addHexPrefix(this.stateTree.root.toString('hex'))
-    //
-    // // TODO We need to save raw signatures for dispute resolutions
-    // const acceptanceSignaturesArray: Buffer[] = await Promise.all(this.participants.map(async (party: Participant) => { return solUtils.stringToBytes((await party.makeAcceptanceSignature())) }))
-    // // console.log(JSON.stringify(acceptanceSignaturesArray))
-    // const acceptanceSHA3HashesArray: Buffer[] = acceptanceSignaturesArray.map((e: Buffer) => {
-    //   console.log(e.length)
-    //   return util.sha3(e)
-    // })
-
-    // // solUtils.printBufferArrayAs0xString(acceptanceSignaturesArray)
-    //
-    // // console.log(JSON.stringify(acceptanceSignaturesArray))
-    // this.stateAcceptanceTree = new MerkleTree(acceptanceSHA3HashesArray)
-    // // const acceptanceMerkleRoot: string = util.addHexPrefix(this.acceptanceTree.root.toString('hex'))
-    //
-    // this.ownersTree = new MerkleTree(accountHashesArray)
-    // // const ownersMerkleRoot = util.addHexPrefix(this.ownersTree.root.toString('hex'))
-    //
-    // const ownersAcceptanceHashesArray: Buffer[] = await Promise.all(this.participants.map(async (party: Participant) => { return util.toBuffer(await party.makeOwnersAcceptanceSignature(this.checkpointIdNext, this.ownersTreeRoot())) }))
-    // const ownersAcceptanceSHA3HashesArray: Buffer[] = ownersAcceptanceHashesArray.map((e: Buffer) => util.sha3(e))
-    // this.ownersAcceptanceTree = new MerkleTree(ownersAcceptanceSHA3HashesArray)
   }
 
   addCheckpoint (checkpoint: Checkpoint) {
