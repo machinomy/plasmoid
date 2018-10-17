@@ -15,4 +15,7 @@ export class DepositTransaction extends Transaction {
     this.lock = lock ? lock : ''
   }
 
+  transactionDigest (): Buffer {
+    return solUtils.keccak256(solUtils.stringToBytes(this.mnemonic), solUtils.stringToBytes(this.lock), solUtils.bignumberToUint256(this.amount))
+  }
 }

@@ -10,4 +10,8 @@ export class Transaction {
   constructor (mnemonic: string | undefined) {
     this.mnemonic = mnemonic ? mnemonic : ''
   }
+
+  type (): string {
+    return this.mnemonic
+  }
 }

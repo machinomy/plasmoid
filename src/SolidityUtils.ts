@@ -42,7 +42,7 @@ export function keccak256 (...args: Buffer[]): Bytes32 {
 }
 
 export function keccak256FromStrings (...args: string[]): Bytes32 {
-  return util.sha3(stringToBytes(args.join('')))
+  return util.sha3(Buffer.concat(args.map(stringToBuffer)))
 }
 
 export function bytes32To0xString (input: Bytes32): string {

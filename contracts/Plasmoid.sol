@@ -77,7 +77,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
         bytes32 hash = keccak256(abi.encodePacked(_transactionsMerkleRoot, _changesSparseMerkleRoot, _accountsStateSparseMerkleRoot));
-        require(LibService.isValidSignature(hash, owner, signature), "Signature is not valid");
+        require(LibService.isValidSignature(hash, this.owner(), signature), "makeCheckpoint: Signature is not valid");
         checkpoints[checkpointIDNow] = LibStructs.Checkpoint({ id: checkpointIDNow,
                                                     transactionsMerkleRoot: _transactionsMerkleRoot,
                                                     changesSparseMerkleRoot: _changesSparseMerkleRoot,
@@ -109,8 +109,8 @@ contract Plasmoid is Ownable, DepositWithdraw {
     /// @param _proof proof
     /// @param _unlock unlock
     function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) {
-        bytes32 hash = keccak256(abi.encodePacked("w", _slotID, _amount));
-        require(LibService.isValidSignature(hash, _lock, _unlock), "Signature is not valid");
+        bytes32 hash = keccak256(abi.encodePacked("w", _lock, _amount));
+        require(LibService.isValidSignature(hash, _lock, _unlock), "startWithdrawal: Signature is not valid");
         withdrawalQueue[withdrawalQueueIDNow] = LibStructs.WithdrawalRequest({ id: withdrawalQueueIDNow, checkpointID: _checkpointID, amount: _amount, lock: _lock, timestamp: block.timestamp });
 
         emit DidStartWithdrawal(withdrawalQueueIDNow, _checkpointID, _amount, _lock, _unlock, withdrawalQueue[withdrawalQueueIDNow].timestamp);
@@ -129,13 +129,13 @@ contract Plasmoid is Ownable, DepositWithdraw {
     /// @param withdrawalID Withdrawal ID
     function finaliseWithdrawal (uint256 withdrawalID) {
         LibStructs.WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
-        require(withdrawalRequest.id != 0, "Withdrawal request is not exists");
+        require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request is not exists");
         uint256 checkpointID = withdrawalRequest.checkpointID;
         LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointID];
         uint256 amount = withdrawalRequest.amount;
         address owner = withdrawalRequest.lock;
-        require(checkpoint.valid == true, "Checkpoint is not valid");
-        require(token.transfer(owner, amount), "Can not transfer tokens to owner");
+        require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
+        require(token.transfer(owner, amount), "finaliseWithdrawal: Can not transfer tokens to owner");
 
         emit DidFinaliseWithdrawal(withdrawalID);
     }

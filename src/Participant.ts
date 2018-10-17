@@ -104,7 +104,6 @@ export class Participant {
   }
 
   async makeCheckpoint (): Promise<truffle.TransactionResult> {
-
     await this.accountService.updateTrees()
 
     const txMerkleRoot = this.accountService.txMerkleRoot()
@@ -121,13 +120,14 @@ export class Participant {
       txMerkleRoot,
       changesMerkleRoot,
       accountsMerkleRoot,
-      checkpointSignature,
+      checkpointSignature + '01',
       { from: this.address })
 
     const eventArgs: PlasmoidWrapper.DidMakeCheckpoint = tx.logs[0].args
     const checkpointUid: BigNumber = eventArgs.id as BigNumber
     const checkpointObj = new Checkpoint(checkpointUid, txMerkleRoot, changesMerkleRoot, accountsMerkleRoot)
     this.accountService.addCheckpoint(checkpointObj)
+    await this.accountService.sync()
     // const tx = {} as truffle.TransactionResult
     return tx
   }

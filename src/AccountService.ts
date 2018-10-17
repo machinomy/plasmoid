@@ -16,7 +16,7 @@ export class AccountService {
   checkpoints:          Map<string, Checkpoint>
   deposits:             Array<DepositTransaction>
   participants:         Array<Participant>
-  txArray:              Array<Transaction>
+  txs:                  Array<Transaction>
   txTree:               MerkleTree | undefined
   changes:              Map<string, BigNumber>
   changesTree:          MerkleTree | undefined
@@ -32,49 +32,52 @@ export class AccountService {
     this.deposits = new Array()
     this.changes = new Map([])
     this.accounts = new Map([])
-    this.txArray = new Array()
+    this.txs = new Array()
     this.checkpoints = new Map()
     this.checkpointIdNext = new BigNumber(2)
     this.plasmoidContract = plasmoidContract
     this.participantAddress = participantAddress.toLowerCase()
   }
 
-  sync () {
+  async sync () {
     for (let party of this.participants) {
       if (party.address !== this.participantAddress) {
         party.accountService.changes = new Map(this.changes)
         party.accountService.accounts = new Map(this.accounts)
-        party.accountService.txArray = JSON.parse(JSON.stringify(this.txArray))
+        party.accountService.txs = [...this.txs]
+        await party.accountService.updateTrees()
       }
     }
+    await this.updateTrees()
   }
-
 
   addParticipant (participant: Participant): Participant {
     this.participants.push(participant)
     return participant
   }
 
-  addDepositTransaction (owner: string, amount: BigNumber): DepositTransaction {
+  async addDepositTransaction (owner: string, amount: BigNumber): Promise<DepositTransaction> {
     const depositTransaction = new DepositTransaction(owner, amount)
-    this.txArray.push(depositTransaction)
+    this.txs.push(depositTransaction)
+    await this.sync()
     return depositTransaction
   }
 
-  addWithdrawalTransaction (owner: string, amount: BigNumber): WithdrawalTransaction {
+  async addWithdrawalTransaction (owner: string, amount: BigNumber): Promise<WithdrawalTransaction> {
     const withdrawalTransaction = new WithdrawalTransaction(owner, amount)
-    this.txArray.push(withdrawalTransaction)
+    this.txs.push(withdrawalTransaction)
+    await this.sync()
     return withdrawalTransaction
   }
 
-  addChange (slotId: BigNumber, txId: BigNumber): void {
+  async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
     this.changes!.set(slotId.toString(), txId)
-    this.sync()
+    await this.sync()
   }
 
-  addAccountChange (slotId: BigNumber, account: string): void {
+  async addAccountChange (slotId: BigNumber, account: string): Promise<void> {
     this.accounts.set(slotId.toString(), account.toLowerCase())
-    this.sync()
+    await this.sync()
   }
 
   getParticipantByAddress (address: string): Participant | undefined {
@@ -89,26 +92,23 @@ export class AccountService {
   }
 
   async updateTrees (): Promise<void> {
-    // const accountHashesArray: Buffer[] = this.participants.map((party: Participant) => { return util.sha3(party.address) })
-
-    const txArray: Buffer[] = this.participants.map((party: Participant) => {
-      return solUtils.keccak256(solUtils.stringToAddress(party.address), solUtils.bignumberToUint256(party.plasmaState.amount))
+    const txArray: Buffer[] = this.txs.map((tx: Transaction) => {
+      let result = new Buffer('')
+      switch (tx.type()) {
+        case 'w': result = (tx as WithdrawalTransaction).transactionDigest()
+          break
+        case 'd': result = (tx as DepositTransaction).transactionDigest()
+          break
+      }
+      return result
     })
-
-    console.log('txArray: ')
-    console.log(txArray)
 
     this.txTree = new MerkleTree(txArray)
 
     const changesArray: Buffer[] = []
 
-    // this.changes!.forEach((value: BigNumber | undefined, key: BigNumber) => {
-    //   changesArray.push(solUtils.bignumberToBuffer(value || new BigNumber(0)))
-    // })
-
     if (this.changes.size) {
       for (let key of this.changes.keys()) {
-        // console.log(`Let I: ${this.changes!.get(key)}`)
         changesArray.push(solUtils.bignumberToBuffer(new BigNumber(this.changes!.get(key) || 0)))
       }
     }
@@ -117,17 +117,12 @@ export class AccountService {
 
     const accountsArray: Buffer[] = []
 
-    // console.log('Accounts: ')
-    // console.log(JSON.stringify(this.accounts))
-
     if (this.accounts.size) {
-      console.log(JSON.stringify(this.accounts))
       for (let key of this.accounts.keys()) {
-        accountsArray.push(solUtils.stringToBuffer(this.accounts.get(key) || '0x'))
+        accountsArray.push(solUtils.keccak256FromStrings(this.accounts.get(key)!))
       }
     }
 
-    console.log(JSON.stringify(accountsArray))
     this.accountsTree = new MerkleTree(accountsArray)
   }
 

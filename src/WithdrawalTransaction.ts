@@ -16,6 +16,6 @@ export class WithdrawalTransaction extends Transaction {
   }
 
   transactionDigest (): Buffer {
-    return solUtils.keccak256(solUtils.stringToBytes(this.lock), solUtils.bignumberToUint256(this.amount))
+    return solUtils.keccak256(solUtils.stringToBytes(this.mnemonic), solUtils.stringToBytes(this.lock), solUtils.bignumberToUint256(this.amount))
   }
 }
