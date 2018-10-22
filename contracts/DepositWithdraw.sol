@@ -32,17 +32,19 @@ contract DepositWithdraw is Checkpoint {
     }
 
     function depositDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("dd", _depositID, _amount));
+        return keccak256(abi.encodePacked("d", _depositID, _amount));
     }
 
     /// @notice Initiate withdrawal from the deposit that has not been included in to a checkpoint.
     /// @param _depositID depositID
     /// @param _unlock Signature of depositDigest (uint256 _depositID, uint256 _amount)
     function depositWithdraw (uint256 _depositID, bytes _unlock) public {
+        require(deposits[_depositID].id != 0, "Deposit does not exists");
+
         LibStructs.Deposit storage depo = deposits[_depositID];
         bytes32 depositWithdrawHash = depositDigest(depo.id, depo.amount);
 
-        require(LibService.isValidSignature(depositWithdrawHash, msg.sender, _unlock), "Signature is not valid");
+        require(LibService.isValidSignature(depositWithdrawHash, msg.sender, _unlock), "depositWithdraw: Signature is not valid");
 
         depositWithdrawalQueue[depositWithdrawalQueueIDNow] = LibStructs.DepositWithdrawalRequest({    id: depositWithdrawalQueueIDNow,
             depositID: _depositID,
@@ -58,7 +60,10 @@ contract DepositWithdraw is Checkpoint {
     /// @notice Challenge the withdrawal request by showing that the deposit is included into the current checkpoint.
     function challengeDepositWithdraw (uint256 _depositWithdrawalID, bytes _proofTransactions, bytes _proofChanges, bytes _proofAccounts) public {
         LibStructs.DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
-        uint256 depositID = depositWithdrawalRequest.depositID;
+
+        require(depositWithdrawalRequest.id != 0, "DepositWithdrawalRequest does not exists");
+
+        uint256 depositID = depositWithdrawalRequest.id;
         LibStructs.Deposit storage _deposit = deposits[depositID];
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
         LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointIDNow.sub(1)];
@@ -83,12 +88,13 @@ contract DepositWithdraw is Checkpoint {
 
     /// @notice If the withdraw attempt has not been challenged during timeout, process with the withdrawal.
     function finaliseDepositWithdraw (uint256 depositWithdrawalID) public {
-        uint256 depositID = depositWithdrawalQueue[depositWithdrawalID].depositID;
+        require(depositWithdrawalQueue[depositWithdrawalID].id != 0, "Deposit withdrawal request is not present");
+
+        uint256 depositID = depositWithdrawalQueue[depositWithdrawalID].id;
         uint256 depositWithdrawalTimestamp = deposits[depositID].timestamp;
         address owner = depositWithdrawalQueue[depositWithdrawalID].owner;
         uint256 amount = deposits[depositID].amount;
 
-        require(depositWithdrawalQueue[depositWithdrawalID].id != 0, "Deposit withdrawal request is not present");
         require(block.timestamp > depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period still proceed");
         require(token.transfer(owner, amount), "Can not transfer tokens to owner");
 

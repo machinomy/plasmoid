@@ -31,12 +31,12 @@ let accountsState: Map<string, PlasmaState> = new Map()
 Plasmoid.link(LibService)
 
 contract('Plasmoid', accounts => {
-  const TOKEN_OWNER: string = accounts[0]
-  const PLASMOID_OWNER: string = accounts[4]
+  const TOKEN_OWNER: string = accounts[0].toLowerCase()
+  const PLASMOID_OWNER: string = accounts[4].toLowerCase()
 
-  const ALICE: string = accounts[1]
-  const BOB: string = accounts[2]
-  const ALIEN: string = accounts[3]
+  const ALICE: string = accounts[1].toLowerCase()
+  const BOB: string = accounts[2].toLowerCase()
+  const ALIEN: string = accounts[3].toLowerCase()
 
   LOG.info(`ALICE: ${ ALICE }`)
   LOG.info(`BOB: ${ BOB }`)
@@ -45,8 +45,6 @@ contract('Plasmoid', accounts => {
 
   let mintableToken: TestToken.Contract
   let plasmoid: contracts.Plasmoid.Contract
-
-
 
   async function sign (address: string, data: string | Buffer): Promise<string> {
     if (data instanceof Buffer) {
@@ -64,55 +62,58 @@ contract('Plasmoid', accounts => {
   }
 
   beforeEach(async () => {
+    const settlementPeriod: BigNumber = new BigNumber(1)
+
+    mintableToken = await MintableToken.new({ from: TOKEN_OWNER })
+    plasmoid = await Plasmoid.new(mintableToken.address,
+      settlementPeriod,
+      settlementPeriod,
+      settlementPeriod,
+      settlementPeriod,
+      { from: PLASMOID_OWNER })
+
+    await mintableToken.mint(ALICE, MINTED, { from: TOKEN_OWNER })
+    await mintableToken.finishMinting({ from: TOKEN_OWNER })
+
+    // const tx = await mintableToken.balanceOf(ALICE)
+    // console.log(tx.toString())
   })
 
-  // describe('Deposit', () => {
-  //   beforeEach(async () => { })
-  //
-  //     test('move token to contract', async () => {
-  //       const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
-  //       const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
-  //       expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
-  //
-  //       await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-  //       await plasmoid.deposit(VALUE, { from: ALICE })
-  //
-  //       const participantAfter = await mintableToken.balanceOf(ALICE)
-  //       const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
-  //
-  //       expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
-  //       expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
-  //     })
-  //
-  //   test('emit event', async () => {
-  //     await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-  //     const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-  //     const event = tx.logs[0]
-  //     const eventArgs: PlasmoidWrapper.DidDeposit = event.args
-  //     expect(PlasmoidWrapper.isDidDepositEvent(event))
-  //     expect(eventArgs.lock).toEqual(ALICE)
-  //     expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
-  //   })
-  // })
+  describe('Deposit', () => {
+    beforeEach(async () => { })
+
+      test('move token to contract', async () => {
+        const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
+        const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+        expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const participantAfter = await mintableToken.balanceOf(ALICE)
+        const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+
+        expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
+        expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
+      })
+
+    test('emit event', async () => {
+      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      const event = tx.logs[0]
+      const eventArgs: PlasmoidWrapper.DidDeposit = event.args
+      expect(PlasmoidWrapper.isDidDepositEvent(event))
+      expect(eventArgs.lock.toLowerCase()).toEqual(ALICE)
+      expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
+    })
+  })
 
   describe('TestCheckpoint', () => {
 
     beforeEach(async () => {
-      const settlementPeriod: BigNumber = new BigNumber(2 * 24 * 60 * 60)
-
-      mintableToken = await MintableToken.new({ from: TOKEN_OWNER })
-      plasmoid = await Plasmoid.new(mintableToken.address,
-                                    settlementPeriod,
-                                    settlementPeriod,
-                                    settlementPeriod,
-                                    settlementPeriod,
-                                    { from: PLASMOID_OWNER })
-
-      await mintableToken.mint(ALICE, MINTED, { from: TOKEN_OWNER })
-      await mintableToken.finishMinting({ from: TOKEN_OWNER })
     })
 
-    test('move token to contract', async () => {
+    test('Scenario', async () => {
       // Account service at Alice Machine
       const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
       // Account service at Bob Machine
@@ -215,6 +216,240 @@ contract('Plasmoid', accounts => {
 
       expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
       expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
+    })
+  })
+
+  describe('Sleepy case', () => {
+    beforeEach(async () => {
+
+    })
+
+    describe('DepositWithdrawal', () => {
+      test('deposit does not exists', async () => {
+        await expect(plasmoid.depositWithdraw(new BigNumber(-1), '0x1234')).rejects.toBeTruthy()
+      })
+
+      test('deposit exists', async () => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        console.log(`hash : ${solUtils.bufferTo0xString(hash)}`)
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+        // PlasmoidWrapper.printEvents(tx2)
+
+        expect(eventArgs2.id.toString()).toEqual('1')
+        expect(eventArgs2.owner.toLowerCase()).toEqual(ALICE.toLowerCase())
+        expect(eventArgs2.unlock).toEqual(unlock)
+        expect(eventArgs2.depositID.toString()).toEqual(eventArgs.id.toString())
+        expect(eventArgs2.checkpointID.toString()).toEqual('0')
+      })
+    })
+
+    describe('ChallengeDepositWithdrawal', () => {
+      beforeEach(async () => {
+
+      })
+
+      test('Deposit withdrawal does not exists in queue', async () => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        // console.log(`hash : ${solUtils.bufferTo0xString(hash)}`)
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+        // PlasmoidWrapper.printEvents(tx2)
+
+        await expect(plasmoid.challengeDepositWithdraw(new BigNumber(-1), '0x1234', '0x5678', '0x9abc')).rejects.toBeTruthy()
+      })
+
+      test('Deposit withdrawal does exists in queue AND timeout is already elapsed ', async (done) => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        // console.log(`hash : ${solUtils.bufferTo0xString(hash)}`)
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+        // PlasmoidWrapper.printEvents(tx2)
+        setTimeout(async () => {
+          await expect(plasmoid.challengeDepositWithdraw(eventArgs2.id, '0x1234', '0x5678', '0x9abc')).rejects.toBeTruthy()
+          done()
+        }, 2000)
+      })
+
+      test('Deposit withdrawal does exists in queue AND timeout still proceed ', async () => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        // console.log(`hash : ${solUtils.bufferTo0xString(hash)}`)
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+        // PlasmoidWrapper.printEvents(tx2)
+
+        const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
+
+        const ttx = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
+                                                  solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
+                                                  solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
+                                                  checkpointSignature + '01', { from: PLASMOID_OWNER })
+
+        const tx3 = await plasmoid.challengeDepositWithdraw(eventArgs2.id, '0x1234', '0x5678', '0x9abc')
+        const eventArgs3: PlasmoidWrapper.DidChallengeDepositWithdraw = tx3.logs[0].args
+        expect(eventArgs3.id.toString()).toEqual(eventArgs2.id.toString())
+      })
+
+      // test('Deposit withdrawal exists in queue', async (done) => {
+      //   const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+      //   const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+      //
+      //   await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      //   const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      //
+      //   const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+      //
+      //   aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+      //   aliceAsPartyAtAlice.plasmaState.amount = VALUE
+      //   const hash = aliceAsPartyAtAlice.makeDepositDigest()
+      //   const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+      //   const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+      //   const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+      //
+      //   setTimeout(async () => {
+      //     const tx3 = await plasmoid.finaliseDepositWithdraw(eventArgs2.id)
+      //     const eventArgs3: PlasmoidWrapper.DidFinaliseDepositWithdraw = tx3.logs[0].args
+      //
+      //     expect(eventArgs3.id.toString()).toEqual(eventArgs2.id.toString())
+      //     done()
+      //   }, 3000)
+      //
+      // })
+      //
+      // test('Deposit withdrawal exists in queue AND timeout still proceed', async () => {
+      //   const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+      //   const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+      //
+      //   await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+      //   const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      //
+      //   const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+      //
+      //   aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+      //   aliceAsPartyAtAlice.plasmaState.amount = VALUE
+      //   const hash = aliceAsPartyAtAlice.makeDepositDigest()
+      //   const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+      //   const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+      //   const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+      //
+      //   await expect(plasmoid.finaliseDepositWithdraw(eventArgs2.id)).rejects.toBeTruthy()
+      // })
+    })
+
+    describe('FinaliseDepositWithdrawal', () => {
+      beforeEach(async () => {
+
+      })
+
+      test('Deposit withdrawal does not exists in queue', async (done) => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+
+        setTimeout(async () => {
+          await expect(plasmoid.finaliseDepositWithdraw(new BigNumber(-1))).rejects.toBeTruthy()
+          done()
+        }, 3000)
+      })
+
+      test('Deposit withdrawal exists in queue', async (done) => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+
+        setTimeout(async () => {
+          const tx3 = await plasmoid.finaliseDepositWithdraw(eventArgs2.id)
+          const eventArgs3: PlasmoidWrapper.DidFinaliseDepositWithdraw = tx3.logs[0].args
+
+          expect(eventArgs3.id.toString()).toEqual(eventArgs2.id.toString())
+          done()
+        }, 3000)
+
+      })
+
+      test('Deposit withdrawal exists in queue AND timeout still proceed', async () => {
+        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+
+        await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+
+        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
+
+        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.amount = VALUE
+        const hash = aliceAsPartyAtAlice.makeDepositDigest()
+        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+        const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
+
+        await expect(plasmoid.finaliseDepositWithdraw(eventArgs2.id)).rejects.toBeTruthy()
+      })
     })
   })
 

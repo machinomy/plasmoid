@@ -94,13 +94,17 @@ export class Participant {
   makeDepositDigest (): Buffer {
     const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
     const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
-    return Buffer.concat([solUtils.stringToBytes('d'), slotIDBuffer, amountBuffer])
+    const concatBuffer = Buffer.concat([solUtils.stringToBytes('d'), slotIDBuffer, amountBuffer])
+    const result = solUtils.keccak256(concatBuffer)
+    return result
   }
 
   makeWithdrawalDigest (): Buffer {
     const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
     const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
-    return Buffer.concat([solUtils.stringToBytes('w'), slotIDBuffer, amountBuffer])
+    const concatBuffer = Buffer.concat([solUtils.stringToBytes('w'), slotIDBuffer, amountBuffer])
+    const result = solUtils.keccak256(concatBuffer)
+    return result
   }
 
   async makeCheckpoint (): Promise<truffle.TransactionResult> {

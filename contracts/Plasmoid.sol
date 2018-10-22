@@ -64,7 +64,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
     }
 
     function depositTransactionDigest (uint256 _amount, address _destination) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("01", _amount, _destination));
+        return keccak256(abi.encodePacked("d", _amount, _destination));
     }
 
     function withdrawalDigest (uint64 _slotID, uint256 _amount) public view returns (bytes32) {
