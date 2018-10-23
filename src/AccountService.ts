@@ -20,7 +20,7 @@ export class AccountService {
   txTree:               MerkleTree | undefined
   changes:              Map<string, BigNumber>
   changesTree:          MerkleTree | undefined
-  accounts:             Map<string, string>
+  accounts:             Map<string, Buffer>
   accountsTree:         MerkleTree | undefined
   checkpointIdNext:     BigNumber
   plasmoidContract:     contracts.Plasmoid.Contract
@@ -75,8 +75,8 @@ export class AccountService {
     await this.sync()
   }
 
-  async addAccountChange (slotId: BigNumber, account: string): Promise<void> {
-    this.accounts.set(slotId.toString(), account.toLowerCase())
+  async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
+    this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
     await this.sync()
   }
 
@@ -109,9 +109,11 @@ export class AccountService {
 
     if (this.changes.size) {
       for (let key of this.changes.keys()) {
-        changesArray.push(solUtils.bignumberToBuffer(new BigNumber(this.changes!.get(key) || 0)))
+        const newElement = solUtils.keccak256(solUtils.bignumberToUint256(new BigNumber(this.changes!.get(key) || 0)))
+        changesArray.push(newElement)
       }
     }
+
 
     this.changesTree = new MerkleTree(changesArray)
 
@@ -119,7 +121,7 @@ export class AccountService {
 
     if (this.accounts.size) {
       for (let key of this.accounts.keys()) {
-        accountsArray.push(solUtils.keccak256FromStrings(this.accounts.get(key)!))
+        accountsArray.push(solUtils.keccak256(this.accounts.get(key)!))
       }
     }
 

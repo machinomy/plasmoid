@@ -40,6 +40,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
     event DidFinaliseFastWithdrawal(uint256 id);
     event DidStartWithdrawal(uint256 id, uint256 checkpointID, uint256 amount, address lock, bytes unlock, uint256 timestamp);
     event DidFinaliseWithdrawal(uint256 id);
+    event DidInvalidate(uint256 checkpointID);
 
     bool halt = false;
 
@@ -215,8 +216,25 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     }
 
-    function invalidate (uint256 checkpointId, bytes32 txId, bytes txProof, uint256 prevSlot, bytes prevProof, uint256 curSlot, bytes curProof ) {
+    function invalidate (uint256 checkpointId, bytes32 tx, bytes txProof, bytes32 prevHash, bytes prevProof, bytes32 curHash, bytes curProof) {
+        require(checkpoints[checkpointId].id != 0, "invalidate: Checkpoint does not exists");
+        require(checkpoints[checkpointId.sub(1)].id != 0, "invalidate: Previous checkpoint does not exists");
 
+        LibStructs.Checkpoint checkpoint = checkpoints[checkpointId];
+        LibStructs.Checkpoint prevCheckpoint = checkpoints[checkpointId];
+
+        require(LibService.isContained(checkpoint.transactionsMerkleRoot, txProof, tx), "invalidate: Tx does not exists in transactionsMerkleRoot");
+
+        require(LibService.isContained(checkpoint.accountsStateSparseMerkleRoot, curProof, curHash), "invalidate: Provided cur slot does not exists in accounts states sparse tree merkle root");
+
+        require(LibService.isContained(checkpoint.accountsStateSparseMerkleRoot, prevProof, prevHash), "invalidate: Provided prev slot does not exists in accounts states sparse tree merkle root");
+
+        // Check for lock-unlock here?
+
+        checkpoint.valid = false;
+        halt = true;
+
+        emit DidInvalidate(checkpointId);
     }
 
     function startFastWithdrawal(bytes32 _slotHash, uint256 _amount) {

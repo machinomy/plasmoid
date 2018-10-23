@@ -2,15 +2,15 @@ pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./Checkpoint.sol";
 import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
+import "./assets/StandardTokenAsset.sol";
 
 
-contract DepositWithdraw is Checkpoint {
+contract DepositWithdraw is Checkpoint, StandardTokenAsset {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
@@ -18,8 +18,6 @@ contract DepositWithdraw is Checkpoint {
 
     uint256 public depositWithdrawalQueueIDNow;
     uint256 public depositIDNow;
-
-    StandardToken public token;
 
     mapping (uint256 => LibStructs.Deposit) public deposits;
     mapping (uint256 => LibStructs.DepositWithdrawalRequest) public depositWithdrawalQueue;
