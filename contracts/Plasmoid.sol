@@ -83,7 +83,10 @@ contract Plasmoid is Ownable, DepositWithdraw {
                                                     changesSparseMerkleRoot: _changesSparseMerkleRoot,
                                                     accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
                                                     valid: true });
+
         emit DidMakeCheckpoint(checkpointIDNow);
+
+        checkpointIDNow = checkpointIDNow.add(1);
     }
 
     /// @notice User deposits funds to the contract.
@@ -110,7 +113,10 @@ contract Plasmoid is Ownable, DepositWithdraw {
     /// @param _unlock unlock
     function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) {
         bytes32 hash = keccak256(abi.encodePacked("w", _lock, _amount));
+
+        require(checkpoints[_checkpointID].id != 0, "startWithdrawal: Checkpoint does not exists");
         require(LibService.isValidSignature(hash, _lock, _unlock), "startWithdrawal: Signature is not valid");
+
         withdrawalQueue[withdrawalQueueIDNow] = LibStructs.WithdrawalRequest({ id: withdrawalQueueIDNow, checkpointID: _checkpointID, amount: _amount, lock: _lock, timestamp: block.timestamp });
 
         emit DidStartWithdrawal(withdrawalQueueIDNow, _checkpointID, _amount, _lock, _unlock, withdrawalQueue[withdrawalQueueIDNow].timestamp);
@@ -129,12 +135,18 @@ contract Plasmoid is Ownable, DepositWithdraw {
     /// @param withdrawalID Withdrawal ID
     function finaliseWithdrawal (uint256 withdrawalID) {
         LibStructs.WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
-        require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request is not exists");
+
+        require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request does not exists");
+
         uint256 checkpointID = withdrawalRequest.checkpointID;
         LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointID];
+
+        require(checkpoint.id != 0, "finaliseWithdrawal: Checkpoint does not exists");
+        require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
+
         uint256 amount = withdrawalRequest.amount;
         address owner = withdrawalRequest.lock;
-        require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
+
         require(token.transfer(owner, amount), "finaliseWithdrawal: Can not transfer tokens to owner");
 
         emit DidFinaliseWithdrawal(withdrawalID);
@@ -142,6 +154,8 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     /// @notice Ask the operator for contents of the slot in the checkpoint.
     function querySlot (uint256 checkpointID, uint64 slotID) {
+        require(checkpoints[checkpointID].id != 0, "querySlot: Checkpoint does not exists");
+
         stateQueryQueue[stateQueryQueueIDNow] = LibStructs.StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
 
         emit DidQuerySlot(stateQueryQueueIDNow, checkpointID, slotID, stateQueryQueue[stateQueryQueueIDNow].timestamp);
@@ -152,7 +166,12 @@ contract Plasmoid is Ownable, DepositWithdraw {
     /// @notice The operator responds back with a proof and contents of the slot.
     function responseQueryState (uint64 _queryID, bytes _proof, uint256 _amount, bytes _lock) {
         LibStructs.StateQueryRequest storage query = stateQueryQueue[_queryID];
+
+        require(query.id != 0, "responseQueryState: State query request does not exists");
+
         LibStructs.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
+
+        require(checkpoint.id != 0, "responseQueryState: Checkpoint does not exists");
 
 //        prove(checkpoint, query.slotID, _amount, _lock, _proof);
 
@@ -163,11 +182,11 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     /// @notice If operator does not answer in timeout then make checkpoint invalid and halt.
     function finaliseQueryState (uint64 _queryID) {
-        require(stateQueryQueue[_queryID].id != 0, "State query request does not exists");
+        require(stateQueryQueue[_queryID].id != 0, "finaliseQueryState: State query request does not exists");
 
         uint256 stateQueryTimestamp = stateQueryQueue[_queryID].timestamp;
 
-        require(block.timestamp > stateQueryTimestamp + stateQueryPeriod, "State query settling period still proceed");
+        require(block.timestamp > stateQueryTimestamp + stateQueryPeriod, "finaliseQueryState: State query settling period still proceed");
 
         halt = true;
     }

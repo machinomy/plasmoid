@@ -112,7 +112,10 @@ contract DepositWithdraw is Checkpoint {
         bytes32 _checkpointAccountsStateSparseMerkleRoot,
         bytes _proofTransactions,
         bytes _proofChanges,
-        bytes _proofAccounts) public returns (bool){
+        bytes _proofAccounts) public returns (bool) {
+
+        require(deposits[_depositID].id != 0, "Deposit does not exists");
+
         bytes32 digest = depositDigest(_depositID, _amount);
         //        if (LibService.isValidSignature(digest, _lock, _unlock)) {
         //            return true;
