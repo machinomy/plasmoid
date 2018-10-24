@@ -239,9 +239,8 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
         bytes32 txDigest = transactionDigest(_txID, _txType, _lock, _amount);
 
-        require(LibService.isValidSignature(txDigest, _lock, _signature), "invalidate: Signature of transaction is invalid");
-
-        require(LibService.isContained(checkpoints[_checkpointId].transactionsMerkleRoot, _txProof, txDigest), "invalidate: Tx does not exists in transactionsMerkleRoot");
+        require(LibService.isContained(checkpoints[_checkpointId].transactionsMerkleRoot, _txProof, txDigest) == false
+                || LibService.isValidSignature(txDigest, _lock, _signature) == false, "invalidate: State is valid");
 
         checkpoints[_checkpointId].valid = false;
 

@@ -877,7 +877,250 @@ contract('Plasmoid', accounts => {
     })
 
     describe('Invalidate', () => {
-      test('All right', async () => {
+      test('Do not halt - system state is good', async () => {
+        await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
+        await aliceAsPartyAtAlice.deposit(new BigNumber(90))
+
+        const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
+
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
+
+        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
+
+        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+
+        const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpoint2 = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpointEvents2: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint2.logs[0].args
+
+        const proof = accountServiceAtAlice.txTree!.proof(depositTransaction.transactionDigest())
+
+        const proofAsString = solUtils.bufferArrayTo0xString(proof)
+
+        const tx = solUtils.bufferTo0xString(depositTransaction.transactionDigest())
+
+        const slotPrev = new BigNumber(2)
+
+        const slotCur = new BigNumber(3)
+
+        const key = accountServiceAtAlice.accounts.get(slotPrev.toString())!
+
+        const keyHash = solUtils.keccak256(key)
+
+        // console.log(`key ~ ${key}, keyHash ~ ${solUtils.bufferTo0xString(keyHash)}`)
+
+        const keyProofs = accountServiceAtAlice.accountsTree!.proof(keyHash)
+
+        const proofPrev = solUtils.bufferArrayTo0xString(keyProofs)
+
+        // // //
+
+        const keyCur = accountServiceAtAlice.accounts.get(slotCur.toString())!
+
+        const keyCurHash = solUtils.keccak256(keyCur)
+
+        // console.log(`keyCur ~ ${keyCur}, keyCurHash ~ ${solUtils.bufferTo0xString(keyCurHash)}`)
+
+        const keyCurProofs = accountServiceAtAlice.accountsTree!.proof(keyCurHash)
+
+        const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
+
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        await expect(plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)).rejects.toBeTruthy()
+      })
+
+      test('Halt - provided signature is not good', async () => {
+        await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
+        await aliceAsPartyAtAlice.deposit(new BigNumber(90))
+
+        const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
+
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
+
+        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
+
+        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+
+        const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpoint2 = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpointEvents2: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint2.logs[0].args
+
+        const proof = accountServiceAtAlice.txTree!.proof(depositTransaction.transactionDigest())
+
+        const proofAsString = solUtils.bufferArrayTo0xString(proof)
+
+        const tx = solUtils.bufferTo0xString(depositTransaction.transactionDigest())
+
+        const slotPrev = new BigNumber(2)
+
+        const slotCur = new BigNumber(3)
+
+        const key = accountServiceAtAlice.accounts.get(slotPrev.toString())!
+
+        const keyHash = solUtils.keccak256(key)
+
+        // console.log(`key ~ ${key}, keyHash ~ ${solUtils.bufferTo0xString(keyHash)}`)
+
+        const keyProofs = accountServiceAtAlice.accountsTree!.proof(keyHash)
+
+        const proofPrev = solUtils.bufferArrayTo0xString(keyProofs)
+
+        // // //
+
+        const keyCur = accountServiceAtAlice.accounts.get(slotCur.toString())!
+
+        const keyCurHash = solUtils.keccak256(keyCur)
+
+        // console.log(`keyCur ~ ${keyCur}, keyCurHash ~ ${solUtils.bufferTo0xString(keyCurHash)}`)
+
+        const keyCurProofs = accountServiceAtAlice.accountsTree!.proof(keyCurHash)
+
+        const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
+
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign('0xbad')
+
+        const tx2 = await plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)
+
+        const eventArgs: PlasmoidWrapper.DidInvalidate = tx2.logs[0].args
+
+        const isHalted = await plasmoid.halt()
+        const isValidCheckpoint = (await plasmoid.checkpoints(txCheckpointEvents2.id))[4]
+
+        expect(eventArgs.checkpointID.toString()).toEqual('2')
+        expect(isValidCheckpoint).toBeFalsy()
+        expect(isHalted).toBeTruthy()
+      })
+
+      test('Halt - provided lock is not good', async () => {
+        await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
+        await aliceAsPartyAtAlice.deposit(new BigNumber(90))
+
+        const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
+
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
+
+        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
+
+        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
+
+        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+
+        const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpoint2 = await operatorAsPartyAtOperator.makeCheckpoint()
+
+        const txCheckpointEvents2: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint2.logs[0].args
+
+        const proof = accountServiceAtAlice.txTree!.proof(depositTransaction.transactionDigest())
+
+        const proofAsString = solUtils.bufferArrayTo0xString(proof)
+
+        const tx = solUtils.bufferTo0xString(depositTransaction.transactionDigest())
+
+        const slotPrev = new BigNumber(2)
+
+        const slotCur = new BigNumber(3)
+
+        const key = accountServiceAtAlice.accounts.get(slotPrev.toString())!
+
+        const keyHash = solUtils.keccak256(key)
+
+        // console.log(`key ~ ${key}, keyHash ~ ${solUtils.bufferTo0xString(keyHash)}`)
+
+        const keyProofs = accountServiceAtAlice.accountsTree!.proof(keyHash)
+
+        const proofPrev = solUtils.bufferArrayTo0xString(keyProofs)
+
+        // // //
+
+        const keyCur = accountServiceAtAlice.accounts.get(slotCur.toString())!
+
+        const keyCurHash = solUtils.keccak256(keyCur)
+
+        // console.log(`keyCur ~ ${keyCur}, keyCurHash ~ ${solUtils.bufferTo0xString(keyCurHash)}`)
+
+        const keyCurProofs = accountServiceAtAlice.accountsTree!.proof(keyCurHash)
+
+        const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
+
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        const tx2 = await plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          ALIEN,
+          new BigNumber(0),
+          signature)
+
+        const eventArgs: PlasmoidWrapper.DidInvalidate = tx2.logs[0].args
+
+        const isHalted = await plasmoid.halt()
+        const isValidCheckpoint = (await plasmoid.checkpoints(txCheckpointEvents2.id))[4]
+
+        expect(eventArgs.checkpointID.toString()).toEqual('2')
+        expect(isValidCheckpoint).toBeFalsy()
+        expect(isHalted).toBeTruthy()
+      })
+
+      test('Halt - provided tx amount is not good', async () => {
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -948,7 +1191,7 @@ contract('Plasmoid', accounts => {
           proofCur,
           solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
           depositTransaction.lock,
-          depositTransaction.amount,
+          new BigNumber(0),
           signature)
 
         const eventArgs: PlasmoidWrapper.DidInvalidate = tx2.logs[0].args
