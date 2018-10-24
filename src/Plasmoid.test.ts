@@ -53,12 +53,12 @@ contract('Plasmoid', accounts => {
       data = data.toString('hex')
     }
     let result = await web3.eth.sign(address, data)
-    // result += '01'
+    result += '01'
     return result
   }
 
   function recover (signature: string, data: any): string {
-    // signature = signature.slice(0, -2)
+    signature = signature.slice(0, -2)
     const result = ethSigUtil.recoverPersonalSignature({ sig: signature, data: data})
     return result
   }
@@ -167,7 +167,7 @@ contract('Plasmoid', accounts => {
       const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
       // Alice starts withdrawal
-      const txStartWithdrawal = await aliceAsPartyAtAlice.startWithdrawal(txCheckpointEvents.id as BigNumber, new BigNumber(1), new BigNumber(90), aliceAsPartyAtAlice.address, proofAsString, signature + '01')
+      const txStartWithdrawal = await aliceAsPartyAtAlice.startWithdrawal(txCheckpointEvents.id as BigNumber, new BigNumber(1), new BigNumber(90), aliceAsPartyAtAlice.address, proofAsString, signature)
 
       PlasmoidWrapper.printEvents(txStartWithdrawal)
 
@@ -275,14 +275,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -321,14 +321,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -363,7 +363,7 @@ contract('Plasmoid', accounts => {
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -393,14 +393,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -431,14 +431,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -470,14 +470,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -515,14 +515,14 @@ contract('Plasmoid', accounts => {
 
         const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
-        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest()) + '01'
+        const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
 
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))
 
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -562,7 +562,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
         // PlasmoidWrapper.printEvents(tx2)
@@ -592,7 +592,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
         // PlasmoidWrapper.printEvents(tx2)
@@ -612,7 +612,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
         // PlasmoidWrapper.printEvents(tx2)
@@ -634,7 +634,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
 
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
@@ -645,7 +645,7 @@ contract('Plasmoid', accounts => {
         const ttx = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const tx3 = await plasmoid.challengeDepositWithdraw(eventArgs2.id, '0x1234', '0x5678', '0x9abc')
         const eventArgs3: PlasmoidWrapper.DidChallengeDepositWithdraw = tx3.logs[0].args
@@ -670,7 +670,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
 
         setTimeout(async () => {
@@ -691,7 +691,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
 
@@ -719,7 +719,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
 
@@ -744,7 +744,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
         const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
 
@@ -765,7 +765,7 @@ contract('Plasmoid', accounts => {
         aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
-        const unlock = await aliceAsPartyAtAlice.sign(hash) + '01'
+        const unlock = await aliceAsPartyAtAlice.sign(hash)
 
         await expect(plasmoid.depositWithdrawProve(new BigNumber(-1),  VALUE, ALICE, unlock, solUtils.bufferTo0xString(hash), solUtils.bufferTo0xString(hash), solUtils.bufferTo0xString(hash), unlock, unlock, unlock)).rejects.toBeTruthy()
       })
@@ -782,7 +782,7 @@ contract('Plasmoid', accounts => {
         const txCheckpoint = await plasmoid.makeCheckpoint(solUtils.bufferTo0xString(solUtils.keccak256FromStrings('transactions')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('changes')),
           solUtils.bufferTo0xString(solUtils.keccak256FromStrings('accounts')),
-          checkpointSignature + '01', { from: PLASMOID_OWNER })
+          checkpointSignature, { from: PLASMOID_OWNER })
 
         const eventCheckpointArgs: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
@@ -805,50 +805,79 @@ contract('Plasmoid', accounts => {
   })
 
   describe('Invalidate checkpoint', () => {
-    beforeEach(async () => { })
+    // Account service at Alice Machine
+    let accountServiceAtAlice: AccountService
+    // Account service at Bob Machine
+    let accountServiceAtBob: AccountService
+    // Account service at Operator Machine
+    let accountServiceAtOperator: AccountService
+
+    // Alice user at Alice Machine
+    let aliceAsPartyAtAlice: Participant
+    // Bob user at Alice Machine
+    let bobAsPartyAtAlice: Participant
+    // Operator user at Alice Machine
+    let operatorAsPartyAtAlice: Participant
+
+    // Alice user at Bob Machine
+    let aliceAsPartyAtBob: Participant
+    // Bob user at Bob Machine
+    let bobAsPartyAtBob: Participant
+    // Operator user at Bob Machine
+    let operatorAsPartyAtBob: Participant
+
+    // Alice user at Operator Machine
+    let aliceAsPartyAtOperator: Participant
+    // Bob user at Operator Machine
+    let bobAsPartyAtOperator: Participant
+    // Operator user at Operator Machine
+    let operatorAsPartyAtOperator: Participant
+
+
+    beforeEach(async () => {
+      // Account service at Alice Machine
+      accountServiceAtAlice = new AccountService(plasmoid, ALICE)
+      // Account service at Bob Machine
+      accountServiceAtBob = new AccountService(plasmoid, BOB)
+      // Account service at Operator Machine
+      accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
+
+      // Alice user at Alice Machine
+      aliceAsPartyAtAlice = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
+      // Bob user at Alice Machine
+      bobAsPartyAtAlice = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
+      // Operator user at Alice Machine
+      operatorAsPartyAtAlice = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
+
+      // Alice user at Bob Machine
+      aliceAsPartyAtBob = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
+      // Bob user at Bob Machine
+      bobAsPartyAtBob = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
+      // Operator user at Bob Machine
+      operatorAsPartyAtBob = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
+
+      // Alice user at Operator Machine
+      aliceAsPartyAtOperator = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
+      // Bob user at Operator Machine
+      bobAsPartyAtOperator = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
+      // Operator user at Operator Machine
+      operatorAsPartyAtOperator = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
+
+      accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
+      accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
+      accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
+
+      accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
+      accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
+      accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
+
+      accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
+      accountServiceAtBob.addParticipant(bobAsPartyAtBob)
+      accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
+    })
 
     describe('Invalidate', () => {
       test('All right', async () => {
-        // Account service at Alice Machine
-        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        // Account service at Bob Machine
-        const accountServiceAtBob = new AccountService(plasmoid, BOB)
-        // Account service at Operator Machine
-        const accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
-
-        // Alice user at Alice Machine
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Alice Machine
-        const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Alice Machine
-        const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Bob Machine
-        const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Bob Machine
-        const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Bob Machine
-        const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Operator Machine
-        const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Operator Machine
-        const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Operator Machine
-        const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
-
-        accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
-
-        accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
-        accountServiceAtBob.addParticipant(bobAsPartyAtBob)
-        accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
-
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -906,54 +935,33 @@ contract('Plasmoid', accounts => {
 
         const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
 
-        const tx2 = await plasmoid.invalidate(txCheckpointEvents2.id, tx, proofAsString, solUtils.bufferTo0xString(keyHash), proofPrev, solUtils.bufferTo0xString(keyCurHash), proofCur)
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        const tx2 = await plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)
 
         const eventArgs: PlasmoidWrapper.DidInvalidate = tx2.logs[0].args
 
+        const isHalted = await plasmoid.halt()
+        const isValidCheckpoint = (await plasmoid.checkpoints(txCheckpointEvents2.id))[4]
+
         expect(eventArgs.checkpointID.toString()).toEqual('2')
+        expect(isValidCheckpoint).toBeFalsy()
+        expect(isHalted).toBeTruthy()
       })
 
       test('Provided cur slot does not exists in accounts states sparse tree merkle root. Bad proof', async () => {
-        // Account service at Alice Machine
-        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        // Account service at Bob Machine
-        const accountServiceAtBob = new AccountService(plasmoid, BOB)
-        // Account service at Operator Machine
-        const accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
-
-        // Alice user at Alice Machine
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Alice Machine
-        const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Alice Machine
-        const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Bob Machine
-        const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Bob Machine
-        const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Bob Machine
-        const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Operator Machine
-        const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Operator Machine
-        const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Operator Machine
-        const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
-
-        accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
-
-        accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
-        accountServiceAtBob.addParticipant(bobAsPartyAtBob)
-        accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
-
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -1005,50 +1013,24 @@ contract('Plasmoid', accounts => {
 
         const keyCurHash = solUtils.keccak256(keyCur)
 
-        await expect(plasmoid.invalidate(txCheckpointEvents2.id, tx, proofAsString, solUtils.bufferTo0xString(keyHash), proofPrev, solUtils.bufferTo0xString(keyCurHash), '0xbad')).rejects.toBeTruthy()
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        await expect(plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          '0xbad',
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)).rejects.toBeTruthy()
       })
 
       test('Provided prev slot does not exists in accounts states sparse tree merkle root. Bad proof', async () => {
-        // Account service at Alice Machine
-        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        // Account service at Bob Machine
-        const accountServiceAtBob = new AccountService(plasmoid, BOB)
-        // Account service at Operator Machine
-        const accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
-
-        // Alice user at Alice Machine
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Alice Machine
-        const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Alice Machine
-        const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Bob Machine
-        const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Bob Machine
-        const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Bob Machine
-        const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Operator Machine
-        const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Operator Machine
-        const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Operator Machine
-        const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
-
-        accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
-
-        accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
-        accountServiceAtBob.addParticipant(bobAsPartyAtBob)
-        accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
-
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -1104,50 +1086,24 @@ contract('Plasmoid', accounts => {
 
         const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
 
-        await expect(plasmoid.invalidate(txCheckpointEvents2.id, tx, proofAsString, solUtils.bufferTo0xString(keyHash), '0xbad', solUtils.bufferTo0xString(keyCurHash), proofCur)).rejects.toBeTruthy()
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        await expect(plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          '0xbad',
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)).rejects.toBeTruthy()
       })
 
       test('Tx does not exists in transactionsMerkleRoot. Bad proof', async () => {
-        // Account service at Alice Machine
-        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        // Account service at Bob Machine
-        const accountServiceAtBob = new AccountService(plasmoid, BOB)
-        // Account service at Operator Machine
-        const accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
-
-        // Alice user at Alice Machine
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Alice Machine
-        const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Alice Machine
-        const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Bob Machine
-        const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Bob Machine
-        const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Bob Machine
-        const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Operator Machine
-        const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Operator Machine
-        const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Operator Machine
-        const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
-
-        accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
-
-        accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
-        accountServiceAtBob.addParticipant(bobAsPartyAtBob)
-        accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
-
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -1203,54 +1159,38 @@ contract('Plasmoid', accounts => {
 
         const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
 
-        await expect(plasmoid.invalidate(txCheckpointEvents2.id, tx, '0xbad', solUtils.bufferTo0xString(keyHash), proofPrev, solUtils.bufferTo0xString(keyCurHash), proofCur)).rejects.toBeTruthy()
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        await expect(plasmoid.invalidate(txCheckpointEvents2.id,
+          txID,
+          '0xbad',
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)).rejects.toBeTruthy()
       })
 
       test('Checkpoint does not exists', async () => {
-        await expect(plasmoid.invalidate(new BigNumber(-1), '0x123', '0xbad', '0x123', '0xbad', '0x123', '0xbad')).rejects.toBeTruthy()
+        await expect(plasmoid.invalidate(new BigNumber(-1),
+          new BigNumber(1),
+          '0xbad',
+          solUtils.bytesTo0xString(solUtils.stringToBytes('hash')),
+          '0xbad',
+          solUtils.bytesTo0xString(solUtils.stringToBytes('hash')),
+          '0xbad',
+          solUtils.bytesTo0xString(solUtils.stringToBytes('hash')),
+          '0x333',
+          new BigNumber(100),
+          '0x0abc')).rejects.toBeTruthy()
       })
 
       test('Previous checkpoint does not exists', async () => {
-        // Account service at Alice Machine
-        const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        // Account service at Bob Machine
-        const accountServiceAtBob = new AccountService(plasmoid, BOB)
-        // Account service at Operator Machine
-        const accountServiceAtOperator = new AccountService(plasmoid, PLASMOID_OWNER)
-
-        // Alice user at Alice Machine
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Alice Machine
-        const bobAsPartyAtAlice: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Alice Machine
-        const operatorAsPartyAtAlice: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Bob Machine
-        const aliceAsPartyAtBob: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Bob Machine
-        const bobAsPartyAtBob: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Bob Machine
-        const operatorAsPartyAtBob: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        // Alice user at Operator Machine
-        const aliceAsPartyAtOperator: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, new BigNumber(90))
-        // Bob user at Operator Machine
-        const bobAsPartyAtOperator: Participant = new Participant(BOB, plasmoid, accountServiceAtBob, new BigNumber(10))
-        // Operator user at Operator Machine
-        const operatorAsPartyAtOperator: Participant = new Participant(PLASMOID_OWNER, plasmoid, accountServiceAtOperator, new BigNumber(0))
-
-        accountServiceAtOperator.addParticipant(aliceAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(bobAsPartyAtOperator)
-        accountServiceAtOperator.addParticipant(operatorAsPartyAtOperator)
-
-        accountServiceAtAlice.addParticipant(aliceAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(bobAsPartyAtAlice)
-        accountServiceAtAlice.addParticipant(operatorAsPartyAtAlice)
-
-        accountServiceAtBob.addParticipant(aliceAsPartyAtBob)
-        accountServiceAtBob.addParticipant(bobAsPartyAtBob)
-        accountServiceAtBob.addParticipant(operatorAsPartyAtBob)
-
         await mintableToken.approve(plasmoid.address, new BigNumber(90), { from: aliceAsPartyAtAlice.address })
         await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
@@ -1269,12 +1209,58 @@ contract('Plasmoid', accounts => {
         await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
 
         await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+
+        const proof = accountServiceAtAlice.txTree!.proof(depositTransaction.transactionDigest())
+
+        const proofAsString = solUtils.bufferArrayTo0xString(proof)
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
         const txCheckpointEvents: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
 
-        await expect(plasmoid.invalidate(txCheckpointEvents.id, '0x123', '0xbad', '0x123', '0xbad', '0x123', '0xbad')).rejects.toBeTruthy()
+        const tx = solUtils.bufferTo0xString(depositTransaction.transactionDigest())
+
+        const slotPrev = new BigNumber(2)
+
+        const slotCur = new BigNumber(3)
+
+        const key = accountServiceAtAlice.accounts.get(slotPrev.toString())!
+
+        const keyHash = solUtils.keccak256(key)
+
+        // console.log(`key ~ ${key}, keyHash ~ ${solUtils.bufferTo0xString(keyHash)}`)
+
+        const keyProofs = accountServiceAtAlice.accountsTree!.proof(keyHash)
+
+        const proofPrev = solUtils.bufferArrayTo0xString(keyProofs)
+
+        // // //
+
+        const keyCur = accountServiceAtAlice.accounts.get(slotCur.toString())!
+
+        const keyCurHash = solUtils.keccak256(keyCur)
+
+        // console.log(`keyCur ~ ${keyCur}, keyCurHash ~ ${solUtils.bufferTo0xString(keyCurHash)}`)
+
+        const keyCurProofs = accountServiceAtAlice.accountsTree!.proof(keyCurHash)
+
+        const proofCur = solUtils.bufferArrayTo0xString(keyCurProofs)
+
+        const txID = new BigNumber(1)
+
+        const signature = await aliceAsPartyAtAlice.sign(depositTransaction.transactionDigest())
+
+        await expect(plasmoid.invalidate(txCheckpointEvents.id,
+          txID,
+          proofAsString,
+          solUtils.bufferTo0xString(keyHash),
+          proofPrev,
+          solUtils.bufferTo0xString(keyCurHash),
+          proofCur,
+          solUtils.bytesTo0xString(solUtils.stringToBytes('d')),
+          depositTransaction.lock,
+          depositTransaction.amount,
+          signature)).rejects.toBeTruthy()
       })
     })
   })

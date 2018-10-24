@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.4.25;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
@@ -29,7 +29,7 @@ contract DepositWithdraw is Checkpoint, StandardTokenAsset {
     constructor () {
     }
 
-    function depositDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
+    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
         return keccak256(abi.encodePacked("d", _depositID, _amount));
     }
 
@@ -40,7 +40,7 @@ contract DepositWithdraw is Checkpoint, StandardTokenAsset {
         require(deposits[_depositID].id != 0, "Deposit does not exists");
 
         LibStructs.Deposit storage depo = deposits[_depositID];
-        bytes32 depositWithdrawHash = depositDigest(depo.id, depo.amount);
+        bytes32 depositWithdrawHash = depositWithdrawDigest(depo.id, depo.amount);
 
         require(LibService.isValidSignature(depositWithdrawHash, msg.sender, _unlock), "depositWithdraw: Signature is not valid");
 
@@ -114,7 +114,7 @@ contract DepositWithdraw is Checkpoint, StandardTokenAsset {
 
         require(deposits[_depositID].id != 0, "Deposit does not exists");
 
-        bytes32 digest = depositDigest(_depositID, _amount);
+        bytes32 digest = depositWithdrawDigest(_depositID, _amount);
         //        if (LibService.isValidSignature(digest, _lock, _unlock)) {
         //            return true;
         //        }

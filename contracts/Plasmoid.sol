@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.4.25;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
@@ -42,7 +42,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
     event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
 
-    bool halt = false;
+    bool public halt = false;
 
     constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() {
         token = StandardToken(_tokenAddress);
@@ -64,12 +64,12 @@ contract Plasmoid is Ownable, DepositWithdraw {
         stateQueryPeriod = _stateQueryPeriod;
     }
 
-    function depositTransactionDigest (uint256 _amount, address _destination) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _amount, _destination));
+    function depositDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("d", _lock, _amount));
     }
 
-    function withdrawalDigest (uint64 _slotID, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("w", _slotID, _amount));
+    function withdrawalDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("w", _lock, _amount));
     }
 
     function accountsDigest (uint256 _amount, address _owner) public view returns (bytes32) {
@@ -216,25 +216,38 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     }
 
-    function invalidate (uint256 checkpointId, bytes32 tx, bytes txProof, bytes32 prevHash, bytes prevProof, bytes32 curHash, bytes curProof) {
-        require(checkpoints[checkpointId].id != 0, "invalidate: Checkpoint does not exists");
-        require(checkpoints[checkpointId.sub(1)].id != 0, "invalidate: Previous checkpoint does not exists");
+    function invalidateInitialChecks (uint256 _checkpointId, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof) private {
+        require(checkpoints[_checkpointId].id != 0, "invalidate: Checkpoint does not exists");
+        require(checkpoints[_checkpointId.sub(1)].id != 0, "invalidate: Previous checkpoint does not exists");
 
-        LibStructs.Checkpoint checkpoint = checkpoints[checkpointId];
-        LibStructs.Checkpoint prevCheckpoint = checkpoints[checkpointId];
+        require(LibService.isContained(checkpoints[_checkpointId].accountsStateSparseMerkleRoot, _curProof, _curHash), "invalidate: Provided cur slot does not exists in accounts states sparse tree merkle root");
+        require(LibService.isContained(checkpoints[_checkpointId.sub(1)].accountsStateSparseMerkleRoot, _prevProof, _prevHash), "invalidate: Provided prev slot does not exists in accounts states sparse tree merkle root");
+    }
 
-        require(LibService.isContained(checkpoint.transactionsMerkleRoot, txProof, tx), "invalidate: Tx does not exists in transactionsMerkleRoot");
+    function invalidateHash (uint256 _txID, bytes32 _txType, address _lock, uint256 _amount) private view returns (bytes32) {
+        if (_txType == "d") {
+            require(deposits[_txID].id != 0, "invalidate: Tx does not exists in deposit queue");
+            return depositDigest(_lock, _amount);
+        } else if (_txType == "w") {
+            require(withdrawalQueue[_txID].id != 0, "invalidate: Tx does not exists in withdrawal queue");
+            return withdrawalDigest(_lock, _amount);
+        }
+    }
 
-        require(LibService.isContained(checkpoint.accountsStateSparseMerkleRoot, curProof, curHash), "invalidate: Provided cur slot does not exists in accounts states sparse tree merkle root");
+    function invalidate (uint256 _checkpointId, uint256 _txID, bytes _txProof, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof, bytes1 _txType, address _lock, uint256 _amount, bytes _signature) {
+        invalidateInitialChecks(_checkpointId, _prevHash, _prevProof, _curHash, _curProof);
 
-        require(LibService.isContained(checkpoint.accountsStateSparseMerkleRoot, prevProof, prevHash), "invalidate: Provided prev slot does not exists in accounts states sparse tree merkle root");
+        bytes32 hash = invalidateHash(_txID, _txType, _lock, _amount);
 
-        // Check for lock-unlock here?
+        require(LibService.isValidSignature(hash, _lock, _signature), "invalidate: Signature of transaction is invalid");
 
-        checkpoint.valid = false;
+        require(LibService.isContained(checkpoints[_checkpointId].transactionsMerkleRoot, _txProof, hash), "invalidate: Tx does not exists in transactionsMerkleRoot");
+
+        checkpoints[_checkpointId].valid = false;
+
         halt = true;
 
-        emit DidInvalidate(checkpointId);
+        emit DidInvalidate(_checkpointId);
     }
 
     function startFastWithdrawal(bytes32 _slotHash, uint256 _amount) {

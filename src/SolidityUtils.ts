@@ -45,6 +45,10 @@ export function keccak256FromStrings (...args: string[]): Bytes32 {
   return util.sha3(Buffer.concat(args.map(stringToBuffer)))
 }
 
+export function bytesTo0xString (input: Bytes): string {
+  return bufferTo0xString(input)
+}
+
 export function bytes32To0xString (input: Bytes32): string {
   return bufferTo0xString(input)
 }

@@ -44,12 +44,12 @@ export class Participant {
       data = data.toString('hex')
     }
     let result = await web3.eth.sign(this.address, data)
-    // result += '01'
+    result += '01'
     return result
   }
 
   recover (signature: string, data: any): string {
-    // signature = signature.slice(0, -2)
+    signature = signature.slice(0, -2)
     const result = ethSigUtil.recoverPersonalSignature({ sig: signature, data: data})
     return result
   }
@@ -91,6 +91,7 @@ export class Participant {
     return tx
   }
 
+  // FIXME Remove that, use transactionHash() from Transaction
   makeDepositDigest (): Buffer {
     const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
     const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
@@ -99,6 +100,7 @@ export class Participant {
     return result
   }
 
+  // FIXME Remove that, use transactionHash() from Transaction
   makeWithdrawalDigest (): Buffer {
     const slotIDBuffer = solUtils.bignumberToUint256(this.plasmaState.slotID)
     const amountBuffer = solUtils.bignumberToUint256(this.plasmaState.amount)
@@ -124,7 +126,7 @@ export class Participant {
       txMerkleRoot,
       changesMerkleRoot,
       accountsMerkleRoot,
-      checkpointSignature + '01',
+      checkpointSignature,
       { from: this.address })
 
     const eventArgs: PlasmoidWrapper.DidMakeCheckpoint = tx.logs[0].args
@@ -139,7 +141,7 @@ export class Participant {
   async transfer (channelId: BigNumber, addressA: string, addressB: string): Promise<truffle.TransactionResult> {
     // const transferDigest = await this.plasmoidContract.transferDigest(channelId, addressB)
     // const transferSignature = await this.sign(addressA, transferDigest)
-    // const tx = await this.plasmoidContract.transfer(channelId, addressB, transferSignature + '01')
+    // const tx = await this.plasmoidContract.transfer(channelId, addressB, transferSignature)
     const tx = {} as truffle.TransactionResult
     return tx
   }
@@ -154,7 +156,7 @@ export class Participant {
     // const disputeRequestDigest = solUtils.keccak256(channelIdAsBuffer, amountAsBuffer, ownerAsBuffer, checkpointIdAsBuffer)
     // // console.log(`disputeRequestDigest = ${solUtils.bufferTo0xString(disputeRequestDigest)}`)
     // const disputeRequestSignature = await this.sign(disputeRequestDigest)
-    // const disputeRequestSignatureAsString = util.addHexPrefix(disputeRequestSignature) + '01'
+    // const disputeRequestSignatureAsString = util.addHexPrefix(disputeRequestSignature)
     // const concatenatedOwnersProofAsString: string = solUtils.bufferArrayTo0xString(this.accountService.ownersTree!.proof(util.sha3(this.address)))
 
     // const tx = await this.plasmoidContract.startDispute(channelId, amount, this.address, disputeRequestSignatureAsString, checkpointId, concatenatedOwnersProofAsString)
@@ -164,7 +166,7 @@ export class Participant {
 
 
   async answerDispute (plasmaState: PlasmaState, disputeRequestID: string, userAcceptanceSignature: string, acceptanceMerkleProof: string): Promise<truffle.TransactionResult> {
-    // const tx = await this.plasmoidContract.answerDispute(plasmaState.channelId, plasmaState.amount, disputeRequestID, userAcceptanceSignature + '01', acceptanceMerkleProof)
+    // const tx = await this.plasmoidContract.answerDispute(plasmaState.channelId, plasmaState.amount, disputeRequestID, userAcceptanceSignature, acceptanceMerkleProof)
     const tx = {} as truffle.TransactionResult
     return tx
   }
