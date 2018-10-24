@@ -224,7 +224,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
         require(LibService.isContained(checkpoints[_checkpointId.sub(1)].accountsStateSparseMerkleRoot, _prevProof, _prevHash), "invalidate: Provided prev slot does not exists in accounts states sparse tree merkle root");
     }
 
-    function invalidateHash (uint256 _txID, bytes32 _txType, address _lock, uint256 _amount) private view returns (bytes32) {
+    function transactionDigest(uint256 _txID, bytes32 _txType, address _lock, uint256 _amount) private view returns (bytes32) {
         if (_txType == "d") {
             require(deposits[_txID].id != 0, "invalidate: Tx does not exists in deposit queue");
             return depositDigest(_lock, _amount);
@@ -237,11 +237,11 @@ contract Plasmoid is Ownable, DepositWithdraw {
     function invalidate (uint256 _checkpointId, uint256 _txID, bytes _txProof, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof, bytes1 _txType, address _lock, uint256 _amount, bytes _signature) {
         invalidateInitialChecks(_checkpointId, _prevHash, _prevProof, _curHash, _curProof);
 
-        bytes32 hash = invalidateHash(_txID, _txType, _lock, _amount);
+        bytes32 txDigest = transactionDigest(_txID, _txType, _lock, _amount);
 
-        require(LibService.isValidSignature(hash, _lock, _signature), "invalidate: Signature of transaction is invalid");
+        require(LibService.isValidSignature(txDigest, _lock, _signature), "invalidate: Signature of transaction is invalid");
 
-        require(LibService.isContained(checkpoints[_checkpointId].transactionsMerkleRoot, _txProof, hash), "invalidate: Tx does not exists in transactionsMerkleRoot");
+        require(LibService.isContained(checkpoints[_checkpointId].transactionsMerkleRoot, _txProof, txDigest), "invalidate: Tx does not exists in transactionsMerkleRoot");
 
         checkpoints[_checkpointId].valid = false;
 
