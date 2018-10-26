@@ -51,6 +51,7 @@ export class AccountService {
         party.accountService.txs = [...this.txs]
         party.accountService.slotID = this.slotID
         party.accountService.txID = this.txID
+        party.accountService.checkpoints = this.checkpoints
         await party.accountService.updateTrees()
       }
     }
