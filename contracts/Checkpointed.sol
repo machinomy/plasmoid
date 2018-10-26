@@ -7,7 +7,7 @@ contract Checkpointed {
 
     mapping (uint256 => CheckpointedLib.Checkpoint) public checkpoints;
 
-    constructor () {
+    constructor () public {
         currentCheckpointId = 1;
     }
 }

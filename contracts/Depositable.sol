@@ -12,7 +12,7 @@ contract Depositable is StandardTokenAsset {
 
     event DidDeposit(uint256 indexed id, uint256 indexed amount, address lock, uint256 indexed timestamp);
 
-    constructor () {
+    constructor () public {
         currentDepositId = 1;
     }
 

@@ -26,7 +26,9 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
     event DidChallengeDepositWithdraw(uint256 id);
     event DidFinaliseDepositWithdraw(uint256 id);
 
-    constructor () Depositable() Checkpointed() {
+    constructor (uint256 _depositWithdrawalPeriod) internal Depositable() Checkpointed() {
+        require(_depositWithdrawalPeriod > 0, "DEPOSIT_WITHDRAWAL_PERIOD_GT_ZERO");
+        depositWithdrawalPeriod = _depositWithdrawalPeriod;
         depositWithdrawalQueueIDNow = 1;
     }
 

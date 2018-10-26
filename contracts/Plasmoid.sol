@@ -41,19 +41,17 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     bool public halt = false;
 
-    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw() {
+    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod) {
         token = StandardToken(_tokenAddress);
         withdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
 
         require(_settlingPeriod > 0, "Settling period must be > 0");
-        require(_depositWithdrawalPeriod > 0, "Deposit withdrawal period must be > 0");
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
         require(_stateQueryPeriod > 0, "State query period must be > 0");
 
         settlingPeriod = _settlingPeriod;
-        depositWithdrawalPeriod = _depositWithdrawalPeriod;
         withdrawalPeriod = _withdrawalPeriod;
         stateQueryPeriod = _stateQueryPeriod;
     }
