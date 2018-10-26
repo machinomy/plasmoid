@@ -1,6 +1,6 @@
 pragma solidity ^0.4.25;
 
-library LibCheckpointed {
+library CheckpointedLib {
     struct Checkpoint {
         uint256 id;
         bytes32 transactionsMerkleRoot;

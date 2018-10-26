@@ -3,11 +3,11 @@ pragma solidity ^0.4.25;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ECRecovery.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "./Checkpoint.sol";
+import "./Checkpointed.sol";
 import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
-import "./LibCheckpointed.sol";
+import "./CheckpointedLib.sol";
 import "./assets/StandardTokenAsset.sol";
 import "./DepositableLib.sol";
 import "./Depositable.sol";
@@ -61,7 +61,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
         uint256 depositID = depositWithdrawalRequest.id;
         DepositableLib.Deposit storage _deposit = deposits[depositID];
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
-        LibCheckpointed.Checkpoint storage checkpoint = checkpoints[currentCheckpointId.sub(1)];
+        CheckpointedLib.Checkpoint storage checkpoint = checkpoints[currentCheckpointId.sub(1)];
 
         require(checkpoint.id != 0, "Checkpoint does not exists");
         require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
