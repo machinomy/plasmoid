@@ -1,9 +1,9 @@
 pragma solidity ^0.4.25;
 
-import "./LibStructs.sol";
+import "./LibCheckpointed.sol";
 
 contract Checkpointed {
     uint256 public checkpointIDNow;
 
-    mapping (uint256 => LibStructs.Checkpoint) public checkpoints;
+    mapping (uint256 => LibCheckpointed.Checkpoint) public checkpoints;
 }

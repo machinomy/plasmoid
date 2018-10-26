@@ -8,6 +8,7 @@ import "./DepositWithdraw.sol";
 import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
+import "./LibCheckpointed.sol";
 
 contract Plasmoid is Ownable, DepositWithdraw {
     using SafeMath for uint256;
@@ -75,7 +76,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
         bytes32 hash = keccak256(abi.encodePacked(_transactionsMerkleRoot, _changesSparseMerkleRoot, _accountsStateSparseMerkleRoot));
         require(LibService.isValidSignature(hash, this.owner(), signature), "makeCheckpoint: Signature is not valid");
-        checkpoints[checkpointIDNow] = LibStructs.Checkpoint({ id: checkpointIDNow,
+        checkpoints[checkpointIDNow] = LibCheckpointed.Checkpoint({ id: checkpointIDNow,
                                                     transactionsMerkleRoot: _transactionsMerkleRoot,
                                                     changesSparseMerkleRoot: _changesSparseMerkleRoot,
                                                     accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
@@ -136,7 +137,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
         require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request does not exists");
 
         uint256 checkpointID = withdrawalRequest.checkpointID;
-        LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointID];
+        LibCheckpointed.Checkpoint storage checkpoint = checkpoints[checkpointID];
 
         require(checkpoint.id != 0, "finaliseWithdrawal: Checkpoint does not exists");
         require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
@@ -166,7 +167,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
         require(query.id != 0, "responseQueryState: State query request does not exists");
 
-        LibStructs.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
+        LibCheckpointed.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
 
         require(checkpoint.id != 0, "responseQueryState: Checkpoint does not exists");
 

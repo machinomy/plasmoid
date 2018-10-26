@@ -7,6 +7,7 @@ import "./Checkpoint.sol";
 import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
+import "./LibCheckpointed.sol";
 import "./assets/StandardTokenAsset.sol";
 
 
@@ -57,7 +58,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset {
         uint256 depositID = depositWithdrawalRequest.id;
         LibStructs.Deposit storage _deposit = deposits[depositID];
         uint256 depositWithdrawalTimestamp = _deposit.timestamp;
-        LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointIDNow.sub(1)];
+        LibCheckpointed.Checkpoint storage checkpoint = checkpoints[checkpointIDNow.sub(1)];
 
         require(checkpoint.id != 0, "Checkpoint does not exists");
         require(block.timestamp <= depositWithdrawalTimestamp + depositWithdrawalPeriod, "Deposit withdrawal settling period is exceeded");
