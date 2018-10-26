@@ -41,8 +41,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     bool public halt = false;
 
-    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod) {
-        token = StandardToken(_tokenAddress);
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) {
         withdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
