@@ -62,7 +62,7 @@ export class AccountService {
     return participant
   }
 
-  async addTransaction (tx: ERC20Transaction): Promise<ERC20Transaction> {
+  private async addTransaction (tx: ERC20Transaction): Promise<ERC20Transaction> {
     this.txs.push(tx)
     await this.addChange(this.slotID, this.txID)
     await this.addAccountChange(this.slotID, tx.lock, tx.amount)
@@ -82,11 +82,11 @@ export class AccountService {
     return await this.addTransaction(withdrawalTransaction) as WithdrawalTransaction
   }
 
-  async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
+  private async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
     this.changes!.set(slotId.toString(), txId)
   }
 
-  async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
+  private async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
     this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
   }
 
