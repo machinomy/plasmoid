@@ -226,23 +226,24 @@ contract('Plasmoid', accounts => {
 
       test('Deposit successfully added', async () => {
         await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
+        const prevDepositId = await plasmoid.currentDepositId()
         const tx = await plasmoid.deposit(VALUE, { from: ALICE })
-        const event = tx.logs[0]
-        const eventArgs: PlasmoidWrapper.DidDeposit = event.args
+        expect(PlasmoidWrapper.isDidDepositEvent(tx.logs[0]))
+
+        const eventArgs = tx.logs[0].args
 
         const deposit = await plasmoid.deposits(eventArgs.id)
 
-        expect(PlasmoidWrapper.isDidDepositEvent(event))
         expect(eventArgs.lock.toLowerCase()).toEqual(ALICE)
         expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
 
-        expect(deposit[0].toString()).toEqual('1')
+        expect(deposit[0].toString()).toEqual(eventArgs.id.toString())
         expect(deposit[1].toString()).toEqual(VALUE.toString())
         expect(deposit[2].toLowerCase()).toEqual(ALICE)
 
-        const depositIDNow = await plasmoid.depositIDNow()
+        const currentDepositId = await plasmoid.currentDepositId()
 
-        expect(depositIDNow.toString()).toEqual('2')
+        expect(currentDepositId.toNumber()).toEqual(prevDepositId.toNumber() + 1)
       })
 
       test('Try to add deposit with value == 0 ', async () => {
@@ -541,10 +542,6 @@ contract('Plasmoid', accounts => {
   })
 
   describe('Sleepy case', () => {
-    beforeEach(async () => {
-
-    })
-
     describe('DepositWithdrawal', () => {
       test('deposit does not exists', async () => {
         await expect(plasmoid.depositWithdraw(new BigNumber(-1), '0x1234')).rejects.toBeTruthy()
@@ -552,25 +549,25 @@ contract('Plasmoid', accounts => {
 
       test('deposit exists', async () => {
         const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
-        const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
+        const aliceAsPartyAtAlice = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
 
         await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
         const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+        const depositId = tx.logs[0].args.id as BigNumber
 
-        const eventArgs: PlasmoidWrapper.DidDeposit = tx.logs[0].args
-
-        aliceAsPartyAtAlice.plasmaState.slotID = eventArgs.id as BigNumber
+        aliceAsPartyAtAlice.plasmaState.slotID = depositId
         aliceAsPartyAtAlice.plasmaState.amount = VALUE
         const hash = aliceAsPartyAtAlice.makeDepositDigest()
         const unlock = await aliceAsPartyAtAlice.sign(hash)
-        const tx2 = await plasmoid.depositWithdraw (eventArgs.id, unlock, { from: ALICE })
+
+        const tx2 = await plasmoid.depositWithdraw(depositId, unlock, { from: ALICE })
         const eventArgs2: PlasmoidWrapper.DidDepositWithdraw = tx2.logs[0].args
         // PlasmoidWrapper.printEvents(tx2)
 
         expect(eventArgs2.id.toString()).toEqual('1')
         expect(eventArgs2.owner.toLowerCase()).toEqual(ALICE.toLowerCase())
         expect(eventArgs2.unlock).toEqual(unlock)
-        expect(eventArgs2.depositID.toString()).toEqual(eventArgs.id.toString())
+        expect(eventArgs2.depositID.toString()).toEqual(depositId.toString())
         expect(eventArgs2.checkpointID.toString()).toEqual('0')
       })
     })
@@ -728,10 +725,6 @@ contract('Plasmoid', accounts => {
     })
 
     describe('DepositWithdrawProve', () => {
-      beforeEach(async () => {
-
-      })
-
       test('Deposit exists in queue', async () => {
         const accountServiceAtAlice = new AccountService(plasmoid, ALICE)
         const aliceAsPartyAtAlice: Participant = new Participant(ALICE, plasmoid, accountServiceAtAlice, VALUE)
@@ -773,8 +766,6 @@ contract('Plasmoid', accounts => {
   })
 
   describe('Ensuring availability of the checkpointed data', () => {
-    beforeEach(async () => { })
-
     describe('QuerySlot', () => {
       test('All right', async () => {
         const checkpointSignature = await sign(PLASMOID_OWNER.toLowerCase(), solUtils.keccak256(solUtils.keccak256FromStrings('transactions'), solUtils.keccak256FromStrings('changes'), solUtils.keccak256FromStrings('accounts')))

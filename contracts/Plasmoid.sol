@@ -9,6 +9,7 @@ import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
 import "./LibCheckpointed.sol";
+import "./Depositable.sol";
 
 contract Plasmoid is Ownable, DepositWithdraw {
     using SafeMath for uint256;
@@ -29,7 +30,6 @@ contract Plasmoid is Ownable, DepositWithdraw {
     mapping (uint256 => LibStructs.Transaction) public transactions;
     mapping (address => bool) public trustedTransactionsList;
 
-    event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
     event DidMakeCheckpoint(uint256 id);
@@ -41,12 +41,9 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     bool public halt = false;
 
-    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() {
+    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw() {
         token = StandardToken(_tokenAddress);
-        depositIDNow = 1;
-        checkpointIDNow = 1;
         withdrawalQueueIDNow = 1;
-        depositWithdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
 
@@ -76,30 +73,15 @@ contract Plasmoid is Ownable, DepositWithdraw {
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
         bytes32 hash = keccak256(abi.encodePacked(_transactionsMerkleRoot, _changesSparseMerkleRoot, _accountsStateSparseMerkleRoot));
         require(LibService.isValidSignature(hash, this.owner(), signature), "makeCheckpoint: Signature is not valid");
-        checkpoints[checkpointIDNow] = LibCheckpointed.Checkpoint({ id: checkpointIDNow,
+        checkpoints[currentCheckpointId] = LibCheckpointed.Checkpoint({ id: currentCheckpointId,
                                                     transactionsMerkleRoot: _transactionsMerkleRoot,
                                                     changesSparseMerkleRoot: _changesSparseMerkleRoot,
                                                     accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
                                                     valid: true });
 
-        emit DidMakeCheckpoint(checkpointIDNow);
+        emit DidMakeCheckpoint(currentCheckpointId);
 
-        checkpointIDNow = checkpointIDNow.add(1);
-    }
-
-    /// @notice User deposits funds to the contract.
-    /// @notice Add an entry to Deposits list, increase Deposit Counter.
-    /// @notice Future: Use an asset manager to transfer the asset into the contract.
-    /// @param _amount Amount of asset
-    function deposit(uint256 _amount) public {
-        require(_amount > 0, "Can not deposit 0");
-        require(token.transferFrom(msg.sender, address(this), _amount), "Can not transfer");
-
-        deposits[depositIDNow] = LibStructs.Deposit({ id: depositIDNow, amount: _amount, lock: msg.sender, timestamp: block.timestamp });
-
-        emit DidDeposit(depositIDNow, _amount, msg.sender, deposits[depositIDNow].timestamp);
-
-        depositIDNow = depositIDNow.add(1);
+        currentCheckpointId = currentCheckpointId.add(1);
     }
 
     /// @notice Initiate withdrawal from the contract.
