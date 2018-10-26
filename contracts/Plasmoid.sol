@@ -22,10 +22,6 @@ contract Plasmoid is Ownable, DepositWithdraw {
     uint256 public stateQueryQueueIDNow;
     uint256 public fastWithdrawalIDNow;
 
-//    struct Transaction {
-//        mapping (uint256 => bytes32) public assetTypes;
-//    }
-
     mapping (uint256 => LibStructs.WithdrawalRequest) public withdrawalQueue;
     mapping (uint256 => LibStructs.StateQueryRequest) public stateQueryQueue;
     mapping (uint256 => LibStructs.FastWithdrawal) public fastWithdrawals;

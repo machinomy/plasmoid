@@ -10,7 +10,7 @@ import "./LibService.sol";
 import "./assets/StandardTokenAsset.sol";
 
 
-contract DepositWithdraw is Checkpoint, StandardTokenAsset {
+contract DepositWithdraw is Checkpointed, StandardTokenAsset {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
@@ -25,13 +25,6 @@ contract DepositWithdraw is Checkpoint, StandardTokenAsset {
     event DidDepositWithdraw(uint256 id, uint256 depositID, bytes unlock, address owner, uint256 checkpointID);
     event DidChallengeDepositWithdraw(uint256 id);
     event DidFinaliseDepositWithdraw(uint256 id);
-
-    constructor () {
-    }
-
-    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _depositID, _amount));
-    }
 
     /// @notice Initiate withdrawal from the deposit that has not been included in to a checkpoint.
     /// @param _depositID depositID
@@ -121,5 +114,9 @@ contract DepositWithdraw is Checkpoint, StandardTokenAsset {
 
         return true;
 
+    }
+
+    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("d", _depositID, _amount));
     }
 }
