@@ -6,6 +6,7 @@ import "./LibBytes.sol";
 import "./LibStructs.sol";
 
 library LibService {
+    using SafeMath for uint64;
     using SafeMath for uint256;
     using LibBytes for bytes;
 
@@ -38,5 +39,21 @@ library LibService {
         } else {
             revert("SIGNATURE_UNSUPPORTED");
         }
+    }
+
+    function depositDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("d", _lock, _amount));
+    }
+
+    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("d", _depositID, _amount));
+    }
+
+    function withdrawalDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("w", _lock, _amount));
+    }
+
+    function accountsDigest (uint256 _amount, address _owner) public view returns (bytes32) {
+        return keccak256(abi.encodePacked(_amount, _owner));
     }
 }

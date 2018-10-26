@@ -35,29 +35,14 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable {
     event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
 
-    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) {
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) {
         withdrawalQueueIDNow = 1;
-        stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
 
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
-        require(_stateQueryPeriod > 0, "State query period must be > 0");
 
         settlingPeriod = _settlingPeriod;
         withdrawalPeriod = _withdrawalPeriod;
-        stateQueryPeriod = _stateQueryPeriod;
-    }
-
-    function depositDigest (address _lock, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _lock, _amount));
-    }
-
-    function withdrawalDigest (address _lock, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("w", _lock, _amount));
-    }
-
-    function accountsDigest (uint256 _amount, address _owner) public view returns (bytes32) {
-        return keccak256(abi.encodePacked(_amount, _owner));
     }
 
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
@@ -135,10 +120,10 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable {
     function transactionDigest(uint256 _txID, bytes32 _txType, address _lock, uint256 _amount) private view returns (bytes32) {
         if (_txType == "d") {
             require(deposits[_txID].id != 0, "invalidate: Tx does not exists in deposit queue");
-            return depositDigest(_lock, _amount);
+            return LibService.depositDigest(_lock, _amount);
         } else if (_txType == "w") {
             require(withdrawalQueue[_txID].id != 0, "invalidate: Tx does not exists in withdrawal queue");
-            return withdrawalDigest(_lock, _amount);
+            return LibService.withdrawalDigest(_lock, _amount);
         }
     }
 
