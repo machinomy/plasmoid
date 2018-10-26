@@ -19,6 +19,13 @@ contract Queryable is Haltable, Checkpointed {
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
 
+    constructor (uint256 _stateQueryPeriod) {
+        require(_stateQueryPeriod > 0, "State query period must be > 0");
+
+        stateQueryQueueIDNow = 1;
+        stateQueryPeriod = _stateQueryPeriod;
+    }
+
     /// @notice Ask the operator for contents of the slot in the checkpoint.
     function querySlot (uint256 checkpointID, uint64 slotID) {
         require(checkpoints[checkpointID].id != 0, "querySlot: Checkpoint does not exists");

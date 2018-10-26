@@ -39,7 +39,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
         require(deposits[_depositID].id != 0, "Deposit does not exists");
 
         DepositableLib.Deposit storage depo = deposits[_depositID];
-        bytes32 depositWithdrawHash = depositWithdrawDigest(depo.id, depo.amount);
+        bytes32 depositWithdrawHash = LibService.depositWithdrawDigest(depo.id, depo.amount);
 
         require(LibService.isValidSignature(depositWithdrawHash, msg.sender, _unlock), "depositWithdraw: Signature is not valid");
 
@@ -113,16 +113,12 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
 
         require(deposits[_depositID].id != 0, "Deposit does not exists");
 
-        bytes32 digest = depositWithdrawDigest(_depositID, _amount);
+        bytes32 digest = LibService.depositWithdrawDigest(_depositID, _amount);
         //        if (LibService.isValidSignature(digest, _lock, _unlock)) {
         //            return true;
         //        }
 
         return true;
 
-    }
-
-    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _depositID, _amount));
     }
 }
