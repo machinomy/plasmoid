@@ -118,9 +118,9 @@ export class Participant {
 
     const checkpointSignature = await this.sign(solUtils.keccak256FromStrings(txMerkleRoot, changesMerkleRoot, accountsMerkleRoot))
 
-    console.log(`txMerkleRoot = ${txMerkleRoot}`)
-    console.log(`changesMerkleRoot = ${changesMerkleRoot}`)
-    console.log(`accountsMerkleRoot = ${accountsMerkleRoot}`)
+    // console.log(`txMerkleRoot = ${txMerkleRoot}`)
+    // console.log(`changesMerkleRoot = ${changesMerkleRoot}`)
+    // console.log(`accountsMerkleRoot = ${accountsMerkleRoot}`)
 
     const tx = await this.plasmoidContract.makeCheckpoint(
       txMerkleRoot,

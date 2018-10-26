@@ -8,7 +8,7 @@ import MerkleTree from './MerkleTree'
 import { Participant } from './Participant'
 import { PlasmaState } from './PlasmaState'
 import * as solUtils from './SolidityUtils'
-import { Transaction } from './Transaction'
+import { ERC20Transaction } from './ERC20Transaction'
 import { WithdrawalTransaction } from './WithdrawalTransaction'
 
 export class AccountService {
@@ -16,7 +16,7 @@ export class AccountService {
   checkpoints:          Map<string, Checkpoint>
   deposits:             Array<DepositTransaction>
   participants:         Array<Participant>
-  txs:                  Array<Transaction>
+  txs:                  Array<ERC20Transaction>
   txTree:               MerkleTree | undefined
   changes:              Map<string, BigNumber>
   changesTree:          MerkleTree | undefined
@@ -25,6 +25,8 @@ export class AccountService {
   checkpointIdNext:     BigNumber
   plasmoidContract:     contracts.Plasmoid.Contract
   participantAddress:   string
+  slotID:               BigNumber
+  txID:                 BigNumber
 
   constructor (plasmoidContract: contracts.Plasmoid.Contract, participantAddress: string) {
     this.accountsState = new Map()
@@ -37,6 +39,8 @@ export class AccountService {
     this.checkpointIdNext = new BigNumber(2)
     this.plasmoidContract = plasmoidContract
     this.participantAddress = participantAddress.toLowerCase()
+    this.slotID = new BigNumber(1)
+    this.txID = new BigNumber(1)
   }
 
   async sync () {
@@ -45,6 +49,8 @@ export class AccountService {
         party.accountService.changes = new Map(this.changes)
         party.accountService.accounts = new Map(this.accounts)
         party.accountService.txs = [...this.txs]
+        party.accountService.slotID = this.slotID
+        party.accountService.txID = this.txID
         await party.accountService.updateTrees()
       }
     }
@@ -56,28 +62,32 @@ export class AccountService {
     return participant
   }
 
+  async addTransaction (tx: ERC20Transaction): Promise<ERC20Transaction> {
+    this.txs.push(tx)
+    await this.addChange(this.slotID, this.txID)
+    await this.addAccountChange(this.slotID, tx.lock, tx.amount)
+    this.slotID = this.slotID.plus(1)
+    this.txID = this.txID.plus(1)
+    await this.sync()
+    return tx
+  }
+
   async addDepositTransaction (owner: string, amount: BigNumber): Promise<DepositTransaction> {
     const depositTransaction = new DepositTransaction(owner, amount)
-    this.txs.push(depositTransaction)
-    await this.sync()
-    return depositTransaction
+    return await this.addTransaction(depositTransaction) as DepositTransaction
   }
 
   async addWithdrawalTransaction (owner: string, amount: BigNumber): Promise<WithdrawalTransaction> {
     const withdrawalTransaction = new WithdrawalTransaction(owner, amount)
-    this.txs.push(withdrawalTransaction)
-    await this.sync()
-    return withdrawalTransaction
+    return await this.addTransaction(withdrawalTransaction) as WithdrawalTransaction
   }
 
   async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
     this.changes!.set(slotId.toString(), txId)
-    await this.sync()
   }
 
   async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
     this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
-    await this.sync()
   }
 
   getParticipantByAddress (address: string): Participant | undefined {
@@ -92,7 +102,7 @@ export class AccountService {
   }
 
   async updateTrees (): Promise<void> {
-    const txArray: Buffer[] = this.txs.map((tx: Transaction) => {
+    const txArray: Buffer[] = this.txs.map((tx: ERC20Transaction) => {
       let result = new Buffer('')
       switch (tx.type()) {
         case 'w': result = (tx as WithdrawalTransaction).transactionDigest()

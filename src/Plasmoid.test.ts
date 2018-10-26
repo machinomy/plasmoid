@@ -135,17 +135,9 @@ contract('Plasmoid', accounts => {
 
       await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
-      await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
+      await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
-      await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-      await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-      await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(90))
-
-      await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-      await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+      await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
       // Operator makes checkpoint
       const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
@@ -884,18 +876,9 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -909,9 +892,11 @@ contract('Plasmoid', accounts => {
 
         const tx = solUtils.bufferTo0xString(depositTransaction.transactionDigest())
 
-        const slotPrev = new BigNumber(2)
+        // this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
 
-        const slotCur = new BigNumber(3)
+        const slotPrev = new BigNumber(1)
+
+        const slotCur = new BigNumber(2)
 
         const key = accountServiceAtAlice.accounts.get(slotPrev.toString())!
 
@@ -959,18 +944,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1043,18 +1018,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1127,18 +1092,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1211,18 +1166,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1280,18 +1225,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1353,18 +1288,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
 
@@ -1440,18 +1365,8 @@ contract('Plasmoid', accounts => {
         const depositTransaction: DepositTransaction = await accountServiceAtAlice.addDepositTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
 
         await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-
-        await accountServiceAtAlice.addChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1))
-
-        await accountServiceAtAlice.addChange(new BigNumber(2), new BigNumber(0x2))
-
-        await accountServiceAtAlice.addChange(new BigNumber(3), new BigNumber(0x1))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(aliceAsPartyAtAlice.accountService.deposits.length).minus(1), ALICE, new BigNumber(100))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(2), ALICE, new BigNumber(50))
-
-        await accountServiceAtAlice.addAccountChange(new BigNumber(3), ALICE, new BigNumber(20))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+        await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
 
         const proof = accountServiceAtAlice.txTree!.proof(depositTransaction.transactionDigest())
 

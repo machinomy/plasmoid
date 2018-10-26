@@ -1,18 +1,13 @@
 import { BigNumber } from 'bignumber.js'
 import { Buffer } from 'safe-buffer'
 import * as solUtils from './SolidityUtils'
-import { Transaction } from './Transaction'
+import { ERC20Transaction } from './ERC20Transaction'
 
 const numberToBN = require('number-to-bn')
 
-export class WithdrawalTransaction extends Transaction {
-  amount: BigNumber
-  lock: string
-
+export class WithdrawalTransaction extends ERC20Transaction {
   constructor (lock: string | undefined, amount: BigNumber | undefined) {
-    super('w')
-    this.amount = amount ? amount : new BigNumber(-1)
-    this.lock = lock ? lock : ''
+    super('w', lock, amount)
   }
 
   transactionDigest (): Buffer {
