@@ -8,6 +8,8 @@ import "./DepositWithdraw.sol";
 import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
+import "./CheckpointedLib.sol";
+import "./Depositable.sol";
 
 contract Plasmoid is Ownable, DepositWithdraw {
     using SafeMath for uint256;
@@ -22,17 +24,12 @@ contract Plasmoid is Ownable, DepositWithdraw {
     uint256 public stateQueryQueueIDNow;
     uint256 public fastWithdrawalIDNow;
 
-//    struct Transaction {
-//        mapping (uint256 => bytes32) public assetTypes;
-//    }
-
     mapping (uint256 => LibStructs.WithdrawalRequest) public withdrawalQueue;
     mapping (uint256 => LibStructs.StateQueryRequest) public stateQueryQueue;
     mapping (uint256 => LibStructs.FastWithdrawal) public fastWithdrawals;
     mapping (uint256 => LibStructs.Transaction) public transactions;
     mapping (address => bool) public trustedTransactionsList;
 
-    event DidDeposit(uint256 id, uint256 amount, address lock, uint256 timestamp);
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
     event DidMakeCheckpoint(uint256 id);
@@ -44,22 +41,16 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
     bool public halt = false;
 
-    constructor (address _tokenAddress, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() {
-        token = StandardToken(_tokenAddress);
-        depositIDNow = 1;
-        checkpointIDNow = 1;
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) {
         withdrawalQueueIDNow = 1;
-        depositWithdrawalQueueIDNow = 1;
         stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
 
         require(_settlingPeriod > 0, "Settling period must be > 0");
-        require(_depositWithdrawalPeriod > 0, "Deposit withdrawal period must be > 0");
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
         require(_stateQueryPeriod > 0, "State query period must be > 0");
 
         settlingPeriod = _settlingPeriod;
-        depositWithdrawalPeriod = _depositWithdrawalPeriod;
         withdrawalPeriod = _withdrawalPeriod;
         stateQueryPeriod = _stateQueryPeriod;
     }
@@ -79,30 +70,17 @@ contract Plasmoid is Ownable, DepositWithdraw {
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
         bytes32 hash = keccak256(abi.encodePacked(_transactionsMerkleRoot, _changesSparseMerkleRoot, _accountsStateSparseMerkleRoot));
         require(LibService.isValidSignature(hash, this.owner(), signature), "makeCheckpoint: Signature is not valid");
-        checkpoints[checkpointIDNow] = LibStructs.Checkpoint({ id: checkpointIDNow,
-                                                    transactionsMerkleRoot: _transactionsMerkleRoot,
-                                                    changesSparseMerkleRoot: _changesSparseMerkleRoot,
-                                                    accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
-                                                    valid: true });
+        checkpoints[currentCheckpointId] = CheckpointedLib.Checkpoint({
+            id: currentCheckpointId,
+            transactionsMerkleRoot: _transactionsMerkleRoot,
+            changesSparseMerkleRoot: _changesSparseMerkleRoot,
+            accountsStateSparseMerkleRoot: _accountsStateSparseMerkleRoot,
+            valid: true
+        });
 
-        emit DidMakeCheckpoint(checkpointIDNow);
+        emit DidMakeCheckpoint(currentCheckpointId);
 
-        checkpointIDNow = checkpointIDNow.add(1);
-    }
-
-    /// @notice User deposits funds to the contract.
-    /// @notice Add an entry to Deposits list, increase Deposit Counter.
-    /// @notice Future: Use an asset manager to transfer the asset into the contract.
-    /// @param _amount Amount of asset
-    function deposit(uint256 _amount) public {
-        require(_amount > 0, "Can not deposit 0");
-        require(token.transferFrom(msg.sender, address(this), _amount), "Can not transfer");
-
-        deposits[depositIDNow] = LibStructs.Deposit({ id: depositIDNow, amount: _amount, lock: msg.sender, timestamp: block.timestamp });
-
-        emit DidDeposit(depositIDNow, _amount, msg.sender, deposits[depositIDNow].timestamp);
-
-        depositIDNow = depositIDNow.add(1);
+        currentCheckpointId = currentCheckpointId.add(1);
     }
 
     /// @notice Initiate withdrawal from the contract.
@@ -140,7 +118,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
         require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request does not exists");
 
         uint256 checkpointID = withdrawalRequest.checkpointID;
-        LibStructs.Checkpoint storage checkpoint = checkpoints[checkpointID];
+        CheckpointedLib.Checkpoint storage checkpoint = checkpoints[checkpointID];
 
         require(checkpoint.id != 0, "finaliseWithdrawal: Checkpoint does not exists");
         require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
@@ -170,7 +148,7 @@ contract Plasmoid is Ownable, DepositWithdraw {
 
         require(query.id != 0, "responseQueryState: State query request does not exists");
 
-        LibStructs.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
+        CheckpointedLib.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
 
         require(checkpoint.id != 0, "responseQueryState: Checkpoint does not exists");
 
