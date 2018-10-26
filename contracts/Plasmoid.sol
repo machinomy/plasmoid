@@ -15,7 +15,6 @@ contract Plasmoid is Ownable, DepositWithdraw {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
-    uint256 public settlingPeriod;
     uint256 public withdrawalPeriod;
     uint256 public stateQueryPeriod;
     uint256 public fastWithdrawalPeriod;
@@ -46,7 +45,6 @@ contract Plasmoid is Ownable, DepositWithdraw {
         stateQueryQueueIDNow = 1;
         fastWithdrawalIDNow = 1;
 
-        require(_settlingPeriod > 0, "Settling period must be > 0");
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
         require(_stateQueryPeriod > 0, "State query period must be > 0");
 

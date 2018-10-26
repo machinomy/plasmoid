@@ -9,11 +9,14 @@ contract Depositable is StandardTokenAsset {
 
     uint256 public currentDepositId;
     mapping (uint256 => DepositableLib.Deposit) public deposits;
+    uint256 public settlingPeriod;
 
     event DidDeposit(uint256 indexed id, uint256 indexed amount, address lock, uint256 indexed timestamp);
 
-    constructor (address _token) public StandardTokenAsset(_token) {
+    constructor (uint256 _settlingPeriod, address _token) public StandardTokenAsset(_token) {
         currentDepositId = 1;
+        require(_settlingPeriod > 0, "Settling period must be > 0");
+        settlingPeriod = _settlingPeriod;
     }
 
     /// @notice User deposits funds to the contract.
