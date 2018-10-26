@@ -10,35 +10,30 @@ import "./LibStructs.sol";
 import "./LibService.sol";
 import "./CheckpointedLib.sol";
 import "./Depositable.sol";
+import "./Queryable.sol";
 
-contract Plasmoid is Ownable, DepositWithdraw {
+contract Plasmoid is Ownable, DepositWithdraw, Queryable {
+    using SafeMath for uint64;
     using SafeMath for uint256;
     using LibBytes for bytes;
 
     uint256 public withdrawalPeriod;
-    uint256 public stateQueryPeriod;
     uint256 public fastWithdrawalPeriod;
 
     uint256 public withdrawalQueueIDNow;
-    uint256 public stateQueryQueueIDNow;
     uint256 public fastWithdrawalIDNow;
 
     mapping (uint256 => LibStructs.WithdrawalRequest) public withdrawalQueue;
-    mapping (uint256 => LibStructs.StateQueryRequest) public stateQueryQueue;
     mapping (uint256 => LibStructs.FastWithdrawal) public fastWithdrawals;
     mapping (uint256 => LibStructs.Transaction) public transactions;
     mapping (address => bool) public trustedTransactionsList;
 
-    event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
-    event DidResponseQueryState(uint64 id);
     event DidMakeCheckpoint(uint256 id);
     event DidStartFastWithdrawal(uint256 id, bytes32 slotHash, uint256 amount, uint256 timestamp);
     event DidFinaliseFastWithdrawal(uint256 id);
     event DidStartWithdrawal(uint256 id, uint256 checkpointID, uint256 amount, address lock, bytes unlock, uint256 timestamp);
     event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
-
-    bool public halt = false;
 
     constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) {
         withdrawalQueueIDNow = 1;
@@ -127,69 +122,6 @@ contract Plasmoid is Ownable, DepositWithdraw {
         require(token.transfer(owner, amount), "finaliseWithdrawal: Can not transfer tokens to owner");
 
         emit DidFinaliseWithdrawal(withdrawalID);
-    }
-
-    /// @notice Ask the operator for contents of the slot in the checkpoint.
-    function querySlot (uint256 checkpointID, uint64 slotID) {
-        require(checkpoints[checkpointID].id != 0, "querySlot: Checkpoint does not exists");
-
-        stateQueryQueue[stateQueryQueueIDNow] = LibStructs.StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
-
-        emit DidQuerySlot(stateQueryQueueIDNow, checkpointID, slotID, stateQueryQueue[stateQueryQueueIDNow].timestamp);
-
-        stateQueryQueueIDNow = stateQueryQueueIDNow.add(1);
-    }
-
-    /// @notice The operator responds back with a proof and contents of the slot.
-    function responseQueryState (uint64 _queryID, bytes _proof, uint256 _amount, bytes _lock) {
-        LibStructs.StateQueryRequest storage query = stateQueryQueue[_queryID];
-
-        require(query.id != 0, "responseQueryState: State query request does not exists");
-
-        CheckpointedLib.Checkpoint storage checkpoint = checkpoints[query.checkpointID];
-
-        require(checkpoint.id != 0, "responseQueryState: Checkpoint does not exists");
-
-//        prove(checkpoint, query.slotID, _amount, _lock, _proof);
-
-        delete stateQueryQueue[_queryID];
-
-        emit DidResponseQueryState(_queryID);
-    }
-
-    /// @notice If operator does not answer in timeout then make checkpoint invalid and halt.
-    function finaliseQueryState (uint64 _queryID) {
-        require(stateQueryQueue[_queryID].id != 0, "finaliseQueryState: State query request does not exists");
-
-        uint256 stateQueryTimestamp = stateQueryQueue[_queryID].timestamp;
-
-        require(block.timestamp > stateQueryTimestamp + stateQueryPeriod, "finaliseQueryState: State query settling period still proceed");
-
-        halt = true;
-    }
-
-    function queryTransaction (bytes32 txid, uint256 checkpointId) {
-//        txQuery += (id, checkpointId, txid, timeout)
-    }
-
-    function responseQueryTransaction(uint256 queryId, uint64[] ids, address txResolver, bytes unlock, bytes proof) {
-
-    }
-
-    function finaliseQueryTransaction(uint256 queryId) {
-
-    }
-
-    function queryChange (uint64 slotId, uint256 checkpointId) {
-
-    }
-
-    function responseQueryChange(uint256 queryId, bytes32 txid) {
-
-    }
-
-    function finaliseQueryChange(uint256 queryId) {
-
     }
 
     function invalidateInitialChecks (uint256 _checkpointId, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof) private {
