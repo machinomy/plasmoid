@@ -13,7 +13,7 @@ import "./Depositable.sol";
 import "./Queryable.sol";
 import "./FastWithdrawable.sol";
 
-contract Plasmoid is Ownable, DepositWithdraw, Queryable, FastWithdrawable {
+contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithdrawable {
     using SafeMath for uint64;
     using SafeMath for uint256;
     using LibBytes for bytes;
@@ -32,13 +32,11 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable, FastWithdrawable {
     event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
 
-    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) {
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() Depositable(_settlingPeriod, _token) DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) {
         withdrawalQueueIDNow = 1;
-        fastWithdrawalIDNow = 1;
 
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
 
-        settlingPeriod = _settlingPeriod;
         withdrawalPeriod = _withdrawalPeriod;
     }
 
@@ -117,10 +115,10 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable, FastWithdrawable {
     function transactionDigest(uint256 _txID, bytes32 _txType, address _lock, uint256 _amount) private view returns (bytes32) {
         if (_txType == "d") {
             require(deposits[_txID].id != 0, "invalidate: Tx does not exists in deposit queue");
-            return LibService.depositDigest(_lock, _amount);
+            return depositDigest(_lock, _amount);
         } else if (_txType == "w") {
             require(withdrawalQueue[_txID].id != 0, "invalidate: Tx does not exists in withdrawal queue");
-            return LibService.withdrawalDigest(_lock, _amount);
+            return withdrawalDigest(_lock, _amount);
         }
     }
 
@@ -137,5 +135,13 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable, FastWithdrawable {
         halt = true;
 
         emit DidInvalidate(_checkpointId);
+    }
+
+    function depositDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("d", _lock, _amount));
+    }
+
+    function withdrawalDigest (address _lock, uint256 _amount) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("w", _lock, _amount));
     }
 }
