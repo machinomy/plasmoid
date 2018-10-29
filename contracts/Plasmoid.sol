@@ -7,6 +7,7 @@ import "./LibBytes.sol";
 import "./LibStructs.sol";
 import "./LibService.sol";
 import "./CheckpointedLib.sol";
+import "./Checkpointed.sol";
 import "./Depositable.sol";
 import "./Queryable.sol";
 import "./FastWithdrawable.sol";
@@ -30,7 +31,7 @@ contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithd
     event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
 
-    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod) public Ownable() Depositable(_settlingPeriod, _token) DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) {
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod, uint256 _fastWithdrawalPeriod) public Ownable() Depositable(_settlingPeriod, _token) DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) FastWithdrawable(_fastWithdrawalPeriod) {
         withdrawalQueueIDNow = 1;
 
         require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");

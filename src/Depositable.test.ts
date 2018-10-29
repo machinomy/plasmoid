@@ -65,6 +65,7 @@ contract('Depositable', accounts => {
       settlementPeriod,
       settlementPeriod,
       settlementPeriod,
+      settlementPeriod,
       { from: CONTRACT_OWNER })
 
     await mintableToken.mint(ALICE, MINTED, { from: TOKEN_OWNER })

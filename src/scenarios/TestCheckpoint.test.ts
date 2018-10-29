@@ -15,8 +15,6 @@ const LibService = artifacts.require('LibService.sol')
 const LibStructs = artifacts.require('LibStructs.sol')
 const LibCheckpointed = artifacts.require('CheckpointedLib.sol')
 const LibDepositable = artifacts.require('DepositableLib.sol')
-const Depositable = artifacts.require('Depositable.sol')
-const Queryable = artifacts.require('Queryable.sol')
 
 const MINTED = new BigNumber(1000)
 const VALUE = new BigNumber(100)
@@ -28,8 +26,6 @@ Plasmoid.link(LibService)
 Plasmoid.link(LibStructs)
 Plasmoid.link(LibCheckpointed)
 Plasmoid.link(LibDepositable)
-// Plasmoid.link(Depositable)
-// Plasmoid.link(Queryable)
 
 contract('Plasmoid', accounts => {
   const TOKEN_OWNER: string = accounts[0].toLowerCase()
@@ -52,6 +48,7 @@ contract('Plasmoid', accounts => {
 
     mintableToken = await MintableToken.new({from: TOKEN_OWNER})
     plasmoid = await Plasmoid.new(mintableToken.address,
+      settlementPeriod,
       settlementPeriod,
       settlementPeriod,
       settlementPeriod,
@@ -113,57 +110,57 @@ contract('Plasmoid', accounts => {
       await mintableToken.approve(plasmoid.address, new BigNumber(90), {from: aliceAsPartyAtAlice.address})
       const txDeposit = await aliceAsPartyAtAlice.deposit(new BigNumber(90))
 
-      // PlasmoidWrapper.printEvents(txDeposit)
+      PlasmoidWrapper.printEvents(txDeposit)
 
-      // await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-      //
-      // await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-      //
-      // await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
-      //
-      // // Operator makes checkpoint
-      // const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
-      //
-      // // PlasmoidWrapper.printEvents(txCheckpoint)
-      //
-      // const txCheckpointEvents: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
-      //
-      // // Alice want to withdraw, add withdrawal transaction to tx array
-      // const withdrawalTransaction: WithdrawalTransaction = await accountServiceAtAlice.addWithdrawalTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
-      //
-      // // Get proof for hash of Alice's transaction
-      // const proof = accountServiceAtAlice.txTree!.proof(withdrawalTransaction.transactionDigest())
-      //
-      // // Get proof for hash of Alice's transaction as string
-      // const proofAsString = solUtils.bufferArrayTo0xString(proof)
-      //
-      // // Alice signs transaction digest
-      // const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
-      //
-      // // Alice starts withdrawal
-      // const txStartWithdrawal = await aliceAsPartyAtAlice.startWithdrawal(txCheckpointEvents.id as BigNumber, new BigNumber(1), new BigNumber(90), aliceAsPartyAtAlice.address, proofAsString, signature)
-      //
-      // // PlasmoidWrapper.printEvents(txStartWithdrawal)
-      //
-      // const txWithdrawalEvents: PlasmoidWrapper.DidStartWithdrawal = txStartWithdrawal.logs[0].args
-      //
-      // // Alice finalise withdrawal
-      // const txFinaliseWithdrawal = await aliceAsPartyAtAlice.finaliseWithdrawal(txWithdrawalEvents.id as BigNumber)
-      //
-      // // PlasmoidWrapper.printEvents(txFinaliseWithdrawal)
-      //
-      // const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
-      // const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
-      // expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
-      //
-      // await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
-      // await plasmoid.deposit(VALUE, {from: ALICE})
-      //
-      // const participantAfter = await mintableToken.balanceOf(ALICE)
-      // const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
-      //
-      // expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
-      // expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
+      await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+      await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+      await accountServiceAtAlice.addDepositTransaction(accountServiceAtAlice.participantAddress, new BigNumber(90))
+
+      // Operator makes checkpoint
+      const txCheckpoint = await operatorAsPartyAtOperator.makeCheckpoint()
+
+      // PlasmoidWrapper.printEvents(txCheckpoint)
+
+      const txCheckpointEvents: PlasmoidWrapper.DidMakeCheckpoint = txCheckpoint.logs[0].args
+
+      // Alice want to withdraw, add withdrawal transaction to tx array
+      const withdrawalTransaction: WithdrawalTransaction = await accountServiceAtAlice.addWithdrawalTransaction(aliceAsPartyAtAlice.address, new BigNumber(90))
+
+      // Get proof for hash of Alice's transaction
+      const proof = accountServiceAtAlice.txTree!.proof(withdrawalTransaction.transactionDigest())
+
+      // Get proof for hash of Alice's transaction as string
+      const proofAsString = solUtils.bufferArrayTo0xString(proof)
+
+      // Alice signs transaction digest
+      const signature = await aliceAsPartyAtAlice.sign(withdrawalTransaction.transactionDigest())
+
+      // Alice starts withdrawal
+      const txStartWithdrawal = await aliceAsPartyAtAlice.startWithdrawal(txCheckpointEvents.id as BigNumber, new BigNumber(1), new BigNumber(90), aliceAsPartyAtAlice.address, proofAsString, signature)
+
+      // PlasmoidWrapper.printEvents(txStartWithdrawal)
+
+      const txWithdrawalEvents: PlasmoidWrapper.DidStartWithdrawal = txStartWithdrawal.logs[0].args
+
+      // Alice finalise withdrawal
+      const txFinaliseWithdrawal = await aliceAsPartyAtAlice.finaliseWithdrawal(txWithdrawalEvents.id as BigNumber)
+
+      // PlasmoidWrapper.printEvents(txFinaliseWithdrawal)
+
+      const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
+      const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+      expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
+
+      await mintableToken.approve(plasmoid.address, VALUE, {from: ALICE})
+      await plasmoid.deposit(VALUE, {from: ALICE})
+
+      const participantAfter = await mintableToken.balanceOf(ALICE)
+      const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+
+      expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
+      expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
     })
   })
 })
