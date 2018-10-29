@@ -8,7 +8,7 @@ import "./CheckpointedLib.sol";
 import "./Checkpointed.sol";
 import "./QueryableLib.sol";
 
-contract Queryable is Haltable, Checkpointed {
+contract Queryable is Checkpointed, Haltable {
     using SafeMath for uint256;
     using LibBytes for bytes;
 

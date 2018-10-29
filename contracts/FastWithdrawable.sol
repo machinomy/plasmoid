@@ -15,6 +15,7 @@ contract FastWithdrawable {
     mapping (uint256 => FastWithdrawalLib.FastWithdrawal) public fastWithdrawals;
 
     event DidStartFastWithdrawal(uint256 id, bytes32 slotHash, uint256 amount, uint256 timestamp);
+    event DidFinaliseFastWithdrawal(uint256 id);
 
     constructor (uint256 _fastWithdrawalPeriod) public {
         currentFastWithdrawalId = 1;

@@ -173,7 +173,7 @@ contract('Plasmoid', accounts => {
 
         const tx = await plasmoid.startWithdrawal(eventCheckpointArgs.id, new BigNumber(1), VALUE, ALICE, proofAsString, signature)
         const eventStartWithdrawalArgs: PlasmoidWrapper.DidStartWithdrawal = tx.logs[0].args
-        const withdrawalQueueIDNow = await plasmoid.withdrawalQueueIDNow()
+        const withdrawalQueueIDNow = await plasmoid.currentWithdrawalId()
 
         expect(eventStartWithdrawalArgs.id.toString()).toEqual('1')
         expect(eventStartWithdrawalArgs.checkpointID.toString()).toEqual('1')

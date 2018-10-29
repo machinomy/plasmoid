@@ -14,7 +14,7 @@ import "./Depositable.sol";
 import "./DepositWithdrawLib.sol";
 
 
-contract DepositWithdraw is Checkpointed, Depositable {
+contract DepositWithdraw is Depositable, Checkpointed {
     using SafeMath for uint256;
     using LibBytes for bytes;
 

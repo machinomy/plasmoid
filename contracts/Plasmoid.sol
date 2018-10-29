@@ -11,32 +11,20 @@ import "./Checkpointed.sol";
 import "./Depositable.sol";
 import "./Queryable.sol";
 import "./FastWithdrawable.sol";
+import "./Withdrawable.sol";
 
-contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithdrawable {
+contract Plasmoid is Ownable, DepositWithdraw, Withdrawable, Queryable, FastWithdrawable  {
     using SafeMath for uint64;
     using SafeMath for uint256;
     using LibBytes for bytes;
 
-    uint256 public withdrawalPeriod;
-
-    uint256 public withdrawalQueueIDNow;
-
-    mapping (uint256 => LibStructs.WithdrawalRequest) public withdrawalQueue;
     mapping (uint256 => LibStructs.Transaction) public transactions;
     mapping (address => bool) public trustedTransactionsList;
 
     event DidMakeCheckpoint(uint256 id);
-    event DidFinaliseFastWithdrawal(uint256 id);
-    event DidStartWithdrawal(uint256 id, uint256 checkpointID, uint256 amount, address lock, bytes unlock, uint256 timestamp);
-    event DidFinaliseWithdrawal(uint256 id);
     event DidInvalidate(uint256 checkpointID);
 
-    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod, uint256 _fastWithdrawalPeriod) public Ownable() Depositable(_settlingPeriod, _token) DepositWithdraw(_depositWithdrawalPeriod, _token) Queryable(_stateQueryPeriod) FastWithdrawable(_fastWithdrawalPeriod) {
-        withdrawalQueueIDNow = 1;
-
-        require(_withdrawalPeriod > 0, "Withdrawal period must be > 0");
-
-        withdrawalPeriod = _withdrawalPeriod;
+    constructor (address _token, uint256 _settlingPeriod, uint256 _depositWithdrawalPeriod, uint256 _withdrawalPeriod, uint256 _stateQueryPeriod, uint256 _fastWithdrawalPeriod) public Ownable() Depositable(_settlingPeriod, _token) DepositWithdraw(_depositWithdrawalPeriod, _token) Withdrawable(_withdrawalPeriod, _token) Queryable(_stateQueryPeriod) FastWithdrawable(_fastWithdrawalPeriod) {
     }
 
     function makeCheckpoint (bytes32 _transactionsMerkleRoot, bytes32 _changesSparseMerkleRoot, bytes32 _accountsStateSparseMerkleRoot, bytes signature) public {
@@ -53,54 +41,6 @@ contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithd
         emit DidMakeCheckpoint(currentCheckpointId);
 
         currentCheckpointId = currentCheckpointId.add(1);
-    }
-
-    /// @notice Initiate withdrawal from the contract.
-    /// @notice Validate the slot is in the current checkpoint, add the request to a withdrawQueue.
-    /// @param _checkpointID checkpointID
-    /// @param _amount amount
-    /// @param _lock lock
-    /// @param _proof proof
-    /// @param _unlock unlock
-    function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) public {
-        bytes32 hash = keccak256(abi.encodePacked("w", _lock, _amount));
-
-        require(checkpoints[_checkpointID].id != 0, "startWithdrawal: Checkpoint does not exists");
-        require(LibService.isValidSignature(hash, _lock, _unlock), "startWithdrawal: Signature is not valid");
-
-        withdrawalQueue[withdrawalQueueIDNow] = LibStructs.WithdrawalRequest({ id: withdrawalQueueIDNow, checkpointID: _checkpointID, amount: _amount, lock: _lock, timestamp: block.timestamp });
-
-        emit DidStartWithdrawal(withdrawalQueueIDNow, _checkpointID, _amount, _lock, _unlock, withdrawalQueue[withdrawalQueueIDNow].timestamp);
-
-        withdrawalQueueIDNow = withdrawalQueueIDNow.add(1);
-    }
-
-    /// @notice Remove withdrawal attempt if the checkpoint is invalid.
-    /// @param withdrawalID Withdrawal ID
-    function revokeWithdrawal (uint256 withdrawalID) public {
-        LibStructs.WithdrawalRequest storage withdrawalRequest = withdrawalQueue[withdrawalID];
-//        require(withdrawalRequest block.timestamp);
-    }
-
-    /// @notice If the withdrawal has not been challenged during a withdrawal window, one could freely exit the contract.
-    /// @param withdrawalID Withdrawal ID
-    function finaliseWithdrawal (uint256 withdrawalID) public {
-        LibStructs.WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
-
-        require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request does not exists");
-
-        uint256 checkpointID = withdrawalRequest.checkpointID;
-        CheckpointedLib.Checkpoint storage checkpoint = checkpoints[checkpointID];
-
-        require(checkpoint.id != 0, "finaliseWithdrawal: Checkpoint does not exists");
-        require(checkpoint.valid == true, "finaliseWithdrawal: Checkpoint is not valid");
-
-        uint256 amount = withdrawalRequest.amount;
-        address owner = withdrawalRequest.lock;
-
-        require(token.transfer(owner, amount), "finaliseWithdrawal: Can not transfer tokens to owner");
-
-        emit DidFinaliseWithdrawal(withdrawalID);
     }
 
     function invalidateInitialChecks (uint256 _checkpointId, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof) private {
