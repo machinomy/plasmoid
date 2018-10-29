@@ -21,13 +21,6 @@ library LibStructs {
         bytes data;
     }
 
-    struct StateQueryRequest {
-        uint256 id;
-        uint256 checkpointID;
-        uint256 slotID;
-        uint256 timestamp;
-    }
-
     struct Transaction {
         uint256 id;
         uint256 checkpointID;

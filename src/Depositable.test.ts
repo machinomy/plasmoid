@@ -18,7 +18,10 @@ const ethSigUtil = require('eth-sig-util')
 const Plasmoid = artifacts.require<contracts.Plasmoid.Contract>('Plasmoid.sol')
 const Depositable = artifacts.require<contracts.Depositable.Contract>('Depositable.sol')
 const MintableToken = artifacts.require<TestToken.Contract>('TestToken.sol')
+const LibStructs = artifacts.require('LibStructs.sol')
 const LibService = artifacts.require('LibService.sol')
+const LibDepositable = artifacts.require('DepositableLib.sol')
+const LibCheckpointed = artifacts.require('CheckpointedLib.sol')
 
 const MINTED = new BigNumber(1000)
 const VALUE = new BigNumber(100)
@@ -29,8 +32,12 @@ const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
 
 let accountsState: Map<string, PlasmaState> = new Map()
 
+Depositable.link(LibDepositable)
 Depositable.link(LibService)
+Plasmoid.link(LibStructs)
 Plasmoid.link(LibService)
+Plasmoid.link(LibDepositable)
+Plasmoid.link(LibCheckpointed)
 
 contract('Depositable', accounts => {
   let mintableToken: TestToken.Contract
@@ -82,28 +89,28 @@ contract('Depositable', accounts => {
 
     test('Can not transfer token to contract without approval', async () => {
       const participantBefore: BigNumber = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceBefore = await mintableToken.balanceOf(plasmoid.address)
+      const plasmoidBalanceBefore = await mintableToken.balanceOf(depositable.address)
       expect(plasmoidBalanceBefore.toNumber()).toEqual(0)
 
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      await plasmoid.deposit(VALUE, { from: ALICE })
+      await mintableToken.approve(depositable.address, VALUE, { from: ALICE })
+      await depositable.deposit(VALUE, { from: ALICE })
 
       const participantAfter = await mintableToken.balanceOf(ALICE)
-      const plasmoidBalanceAfter = await mintableToken.balanceOf(plasmoid.address)
+      const plasmoidBalanceAfter = await mintableToken.balanceOf(depositable.address)
 
       expect(participantAfter.toNumber()).toEqual(participantBefore.toNumber() - VALUE.toNumber())
       expect(plasmoidBalanceAfter.toString()).toEqual(VALUE.toString())
     })
 
     test('Deposit successfully added', async () => {
-      await mintableToken.approve(plasmoid.address, VALUE, { from: ALICE })
-      const prevDepositId = await plasmoid.currentDepositId()
-      const tx = await plasmoid.deposit(VALUE, { from: ALICE })
+      await mintableToken.approve(depositable.address, VALUE, { from: ALICE })
+      const prevDepositId = await depositable.currentDepositId()
+      const tx = await depositable.deposit(VALUE, { from: ALICE })
       expect(PlasmoidWrapper.isDidDepositEvent(tx.logs[0]))
 
       const eventArgs = tx.logs[0].args
 
-      const deposit = await plasmoid.deposits(eventArgs.id)
+      const deposit = await depositable.deposits(eventArgs.id)
 
       expect(eventArgs.lock.toLowerCase()).toEqual(ALICE)
       expect(eventArgs.amount.toString()).toEqual(VALUE.toString())
@@ -112,7 +119,7 @@ contract('Depositable', accounts => {
       expect(deposit[1].toString()).toEqual(VALUE.toString())
       expect(deposit[2].toLowerCase()).toEqual(ALICE)
 
-      const currentDepositId = await plasmoid.currentDepositId()
+      const currentDepositId = await depositable.currentDepositId()
 
       expect(currentDepositId.toNumber()).toEqual(prevDepositId.toNumber() + 1)
     })
