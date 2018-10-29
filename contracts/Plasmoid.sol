@@ -1,8 +1,6 @@
 pragma solidity ^0.4.25;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/ECRecovery.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./DepositWithdraw.sol";
 import "./LibBytes.sol";
@@ -63,7 +61,7 @@ contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithd
     /// @param _lock lock
     /// @param _proof proof
     /// @param _unlock unlock
-    function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) {
+    function startWithdrawal (uint256 _checkpointID, uint64 _slotID, uint256 _amount, address _lock, bytes _proof, bytes _unlock) public {
         bytes32 hash = keccak256(abi.encodePacked("w", _lock, _amount));
 
         require(checkpoints[_checkpointID].id != 0, "startWithdrawal: Checkpoint does not exists");
@@ -78,14 +76,14 @@ contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithd
 
     /// @notice Remove withdrawal attempt if the checkpoint is invalid.
     /// @param withdrawalID Withdrawal ID
-    function revokeWithdrawal (uint256 withdrawalID) {
+    function revokeWithdrawal (uint256 withdrawalID) public {
         LibStructs.WithdrawalRequest storage withdrawalRequest = withdrawalQueue[withdrawalID];
 //        require(withdrawalRequest block.timestamp);
     }
 
     /// @notice If the withdrawal has not been challenged during a withdrawal window, one could freely exit the contract.
     /// @param withdrawalID Withdrawal ID
-    function finaliseWithdrawal (uint256 withdrawalID) {
+    function finaliseWithdrawal (uint256 withdrawalID) public {
         LibStructs.WithdrawalRequest memory withdrawalRequest = withdrawalQueue[withdrawalID];
 
         require(withdrawalRequest.id != 0, "finaliseWithdrawal: Withdrawal request does not exists");
@@ -122,7 +120,7 @@ contract Plasmoid is Ownable, Depositable, DepositWithdraw, Queryable, FastWithd
         }
     }
 
-    function invalidate (uint256 _checkpointId, uint256 _txID, bytes _txProof, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof, bytes1 _txType, address _lock, uint256 _amount, bytes _signature) {
+    function invalidate (uint256 _checkpointId, uint256 _txID, bytes _txProof, bytes32 _prevHash, bytes _prevProof, bytes32 _curHash, bytes _curProof, bytes1 _txType, address _lock, uint256 _amount, bytes _signature) public {
         invalidateInitialChecks(_checkpointId, _prevHash, _prevProof, _curHash, _curProof);
 
         bytes32 txDigest = transactionDigest(_txID, _txType, _lock, _amount);
