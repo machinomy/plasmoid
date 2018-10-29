@@ -10,23 +10,24 @@ contract FastWithdrawable {
     using LibBytes for bytes;
 
     uint256 public fastWithdrawalPeriod;
-    uint256 public fastWithdrawalIDNow;
+    uint256 public currentFastWithdrawalId;
 
     mapping (uint256 => FastWithdrawalLib.FastWithdrawal) public fastWithdrawals;
 
     event DidStartFastWithdrawal(uint256 id, bytes32 slotHash, uint256 amount, uint256 timestamp);
 
     constructor (uint256 _fastWithdrawalPeriod) public {
+        currentFastWithdrawalId = 1;
         require(_fastWithdrawalPeriod > 0, "Fast withdrawal period must be > 0");
         fastWithdrawalPeriod = _fastWithdrawalPeriod;
     }
 
     function startFastWithdrawal(bytes32 _slotHash, uint256 _amount) {
-        fastWithdrawals[fastWithdrawalIDNow] = FastWithdrawalLib.FastWithdrawal({ id: fastWithdrawalIDNow, slotHash: _slotHash, amount: _amount, timestamp: block.timestamp });
+        fastWithdrawals[currentFastWithdrawalId] = FastWithdrawalLib.FastWithdrawal({ id: currentFastWithdrawalId, slotHash: _slotHash, amount: _amount, timestamp: block.timestamp });
 
-        emit DidStartFastWithdrawal(fastWithdrawalIDNow, _slotHash, _amount, fastWithdrawals[fastWithdrawalIDNow].timestamp);
+        emit DidStartFastWithdrawal(currentFastWithdrawalId, _slotHash, _amount, fastWithdrawals[currentFastWithdrawalId].timestamp);
 
-        fastWithdrawalIDNow = fastWithdrawalIDNow.add(1);
+        currentFastWithdrawalId = currentFastWithdrawalId.add(1);
     }
 
     function finishFastWithdrawal(uint256 fastWithdrawalID, bytes transaction, bytes32 currentSlot, bytes clientSignature) {
