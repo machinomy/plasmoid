@@ -6,6 +6,7 @@ import "./LibStructs.sol";
 import "./Haltable.sol";
 import "./CheckpointedLib.sol";
 import "./Checkpointed.sol";
+import "./QueryableLib.sol";
 
 contract Queryable is Haltable, Checkpointed {
     using SafeMath for uint256;
@@ -14,7 +15,7 @@ contract Queryable is Haltable, Checkpointed {
     uint256 public stateQueryPeriod;
     uint256 public stateQueryQueueIDNow;
 
-    mapping (uint256 => LibStructs.StateQueryRequest) public stateQueryQueue;
+    mapping (uint256 => QueryableLib.StateQueryRequest) public stateQueryQueue;
 
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
@@ -30,7 +31,7 @@ contract Queryable is Haltable, Checkpointed {
     function querySlot (uint256 checkpointID, uint64 slotID) {
         require(checkpoints[checkpointID].id != 0, "querySlot: Checkpoint does not exists");
 
-        stateQueryQueue[stateQueryQueueIDNow] = LibStructs.StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
+        stateQueryQueue[stateQueryQueueIDNow] = QueryableLib.StateQueryRequest({ id: stateQueryQueueIDNow, checkpointID: checkpointID, slotID: slotID, timestamp: block.timestamp });
 
         emit DidQuerySlot(stateQueryQueueIDNow, checkpointID, slotID, stateQueryQueue[stateQueryQueueIDNow].timestamp);
 
@@ -39,7 +40,7 @@ contract Queryable is Haltable, Checkpointed {
 
     /// @notice The operator responds back with a proof and contents of the slot.
     function responseQueryState (uint64 _queryID, bytes _proof, uint256 _amount, bytes _lock) {
-        LibStructs.StateQueryRequest storage query = stateQueryQueue[_queryID];
+        QueryableLib.StateQueryRequest storage query = stateQueryQueue[_queryID];
 
         require(query.id != 0, "responseQueryState: State query request does not exists");
 
