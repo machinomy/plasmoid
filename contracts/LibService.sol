@@ -10,6 +10,11 @@ library LibService {
     using SafeMath for uint256;
     using LibBytes for bytes;
 
+    enum SignatureType {
+        Caller, // 0x00
+        EthSign // 0x01
+    }
+
     function isContained (bytes32 merkleRoot, bytes _proof, bytes32 _datahash) public pure returns (bool) {
         bytes32 proofElement;
         bytes32 cursor = _datahash;
@@ -30,30 +35,14 @@ library LibService {
 
     function isValidSignature (bytes32 _hash, address _signatory, bytes memory _signature) public view returns (bool) {
         uint8 signatureTypeRaw = uint8(_signature.popLastByte());
-        LibStructs.SignatureType signatureType = LibStructs.SignatureType(signatureTypeRaw);
-        if (signatureType == LibStructs.SignatureType.Caller) {
+        SignatureType signatureType = SignatureType(signatureTypeRaw);
+        if (signatureType == SignatureType.Caller) {
             return msg.sender == _signatory;
-        } else if (signatureType == LibStructs.SignatureType.EthSign) {
+        } else if (signatureType == SignatureType.EthSign) {
             address recovered = ECRecovery.recover(ECRecovery.toEthSignedMessageHash(_hash), _signature);
             return recovered == _signatory;
         } else {
             revert("SIGNATURE_UNSUPPORTED");
         }
-    }
-
-    function depositDigest (address _lock, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _lock, _amount));
-    }
-
-    function depositWithdrawDigest (uint256 _depositID, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("d", _depositID, _amount));
-    }
-
-    function withdrawalDigest (address _lock, uint256 _amount) public view returns (bytes32) {
-        return keccak256(abi.encodePacked("w", _lock, _amount));
-    }
-
-    function accountsDigest (uint256 _amount, address _owner) public view returns (bytes32) {
-        return keccak256(abi.encodePacked(_amount, _owner));
     }
 }

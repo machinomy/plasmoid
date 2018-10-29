@@ -34,17 +34,4 @@ library LibStructs {
         uint256 txID;
         uint256 timestamp;
     }
-
-    struct Checkpoint {
-        uint256 id;
-        bytes32 transactionsMerkleRoot;
-        bytes32 changesSparseMerkleRoot;
-        bytes32 accountsStateSparseMerkleRoot;
-        bool valid;
-    }
-
-    enum SignatureType {
-        Caller, // 0x00
-        EthSign // 0x01
-    }
 }
