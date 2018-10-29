@@ -11,6 +11,7 @@ import "./CheckpointedLib.sol";
 import "./assets/StandardTokenAsset.sol";
 import "./DepositableLib.sol";
 import "./Depositable.sol";
+import "./DepositWithdrawLib.sol";
 
 
 contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
@@ -20,7 +21,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
     uint256 public depositWithdrawalPeriod;
     uint256 public depositWithdrawalQueueIDNow;
 
-    mapping (uint256 => LibStructs.DepositWithdrawalRequest) public depositWithdrawalQueue;
+    mapping (uint256 => DepositWithdrawLib.DepositWithdrawalRequest) public depositWithdrawalQueue;
 
     event DidDepositWithdraw(uint256 id, uint256 depositID, bytes unlock, address owner, uint256 checkpointID);
     event DidChallengeDepositWithdraw(uint256 id);
@@ -43,7 +44,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
 
         require(LibService.isValidSignature(depositWithdrawHash, msg.sender, _unlock), "depositWithdraw: Signature is not valid");
 
-        depositWithdrawalQueue[depositWithdrawalQueueIDNow] = LibStructs.DepositWithdrawalRequest({    id: depositWithdrawalQueueIDNow,
+        depositWithdrawalQueue[depositWithdrawalQueueIDNow] = DepositWithdrawLib.DepositWithdrawalRequest({    id: depositWithdrawalQueueIDNow,
             depositID: _depositID,
             unlock: _unlock,
             owner: msg.sender,
@@ -56,7 +57,7 @@ contract DepositWithdraw is Checkpointed, StandardTokenAsset, Depositable {
 
     /// @notice Challenge the withdrawal request by showing that the deposit is included into the current checkpoint.
     function challengeDepositWithdraw (uint256 _depositWithdrawalID, bytes _proofTransactions, bytes _proofChanges, bytes _proofAccounts) public {
-        LibStructs.DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
+        DepositWithdrawLib.DepositWithdrawalRequest storage depositWithdrawalRequest = depositWithdrawalQueue[_depositWithdrawalID];
 
         require(depositWithdrawalRequest.id != 0, "DepositWithdrawalRequest does not exists");
 

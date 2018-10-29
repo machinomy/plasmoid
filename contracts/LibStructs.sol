@@ -28,26 +28,11 @@ library LibStructs {
         uint256 timestamp;
     }
 
-    struct FastWithdrawal {
-        uint256 id;
-        bytes32 slotHash;
-        uint256 amount;
-        uint256 timestamp;
-    }
-
     struct Transaction {
         uint256 id;
         uint256 checkpointID;
         uint256 txID;
         uint256 timestamp;
-    }
-
-    struct DepositWithdrawalRequest {
-        uint256 id;
-        uint256 depositID;
-        bytes unlock;
-        address owner;
-        uint256 checkpointID;
     }
 
     struct Checkpoint {

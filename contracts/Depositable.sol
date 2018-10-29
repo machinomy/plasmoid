@@ -8,8 +8,9 @@ contract Depositable is StandardTokenAsset {
     using SafeMath for uint256;
 
     uint256 public currentDepositId;
-    mapping (uint256 => DepositableLib.Deposit) public deposits;
     uint256 public settlingPeriod;
+
+    mapping (uint256 => DepositableLib.Deposit) public deposits;
 
     event DidDeposit(uint256 indexed id, uint256 indexed amount, address lock, uint256 indexed timestamp);
 

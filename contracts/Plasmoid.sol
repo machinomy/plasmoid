@@ -11,25 +11,22 @@ import "./LibService.sol";
 import "./CheckpointedLib.sol";
 import "./Depositable.sol";
 import "./Queryable.sol";
+import "./FastWithdrawable.sol";
 
-contract Plasmoid is Ownable, DepositWithdraw, Queryable {
+contract Plasmoid is Ownable, DepositWithdraw, Queryable, FastWithdrawable {
     using SafeMath for uint64;
     using SafeMath for uint256;
     using LibBytes for bytes;
 
     uint256 public withdrawalPeriod;
-    uint256 public fastWithdrawalPeriod;
 
     uint256 public withdrawalQueueIDNow;
-    uint256 public fastWithdrawalIDNow;
 
     mapping (uint256 => LibStructs.WithdrawalRequest) public withdrawalQueue;
-    mapping (uint256 => LibStructs.FastWithdrawal) public fastWithdrawals;
     mapping (uint256 => LibStructs.Transaction) public transactions;
     mapping (address => bool) public trustedTransactionsList;
 
     event DidMakeCheckpoint(uint256 id);
-    event DidStartFastWithdrawal(uint256 id, bytes32 slotHash, uint256 amount, uint256 timestamp);
     event DidFinaliseFastWithdrawal(uint256 id);
     event DidStartWithdrawal(uint256 id, uint256 checkpointID, uint256 amount, address lock, bytes unlock, uint256 timestamp);
     event DidFinaliseWithdrawal(uint256 id);
@@ -140,31 +137,5 @@ contract Plasmoid is Ownable, DepositWithdraw, Queryable {
         halt = true;
 
         emit DidInvalidate(_checkpointId);
-    }
-
-    function startFastWithdrawal(bytes32 _slotHash, uint256 _amount) {
-        fastWithdrawals[fastWithdrawalIDNow] = LibStructs.FastWithdrawal({ id: fastWithdrawalIDNow, slotHash: _slotHash, amount: _amount, timestamp: block.timestamp });
-
-        emit DidStartFastWithdrawal(fastWithdrawalIDNow, _slotHash, _amount, fastWithdrawals[fastWithdrawalIDNow].timestamp);
-
-        fastWithdrawalIDNow = fastWithdrawalIDNow.add(1);
-    }
-
-    function finishFastWithdrawal(uint256 fastWithdrawalID, bytes transaction, bytes32 currentSlot, bytes clientSignature) {
-//        FastWithdrawal storage fastWithdrawal = fastWithdrawals[fastWithdrawalID];
-//        uint256 fastWithdrawalTimestamp = fastWithdrawal.timestamp;
-//        require(fastWithdrawal.id != 0, "Fast Withdrawal is not present");
-//
-//        newSlot = applyTransaction(currentSlot, transaction);
-//        if (block.timestamp > fastWithdrawalTimestamp + fastWithdrawalPeriod) {
-//            delete fastWithdrawals[fastWithdrawalID];
-//            return;
-//        }
-//        require(newSlot == fastWithdrawal.slotHash, "Slot hash does not match");
-//        //        unlockAddress = ecrecover(, fwI)
-////        require(require(slot.canUnlock(unlockAddress)), "");
-//        require(token.transfer(owner, fastWithdrawal.amount), "Can not transfer tokens to client");
-//
-//        emit DidFinaliseFastWithdrawal(fastWithdrawalID);
     }
 }

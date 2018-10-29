@@ -19,7 +19,7 @@ contract Queryable is Haltable, Checkpointed {
     event DidQuerySlot(uint256 id, uint256 checkpointID, uint256 slotID, uint256 timestamp);
     event DidResponseQueryState(uint64 id);
 
-    constructor (uint256 _stateQueryPeriod) {
+    constructor (uint256 _stateQueryPeriod) public {
         require(_stateQueryPeriod > 0, "State query period must be > 0");
 
         stateQueryQueueIDNow = 1;
