@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js'
 import { Buffer } from 'safe-buffer'
-import * as util from "ethereumjs-util"
+import * as util from 'ethereumjs-util'
 import { Checkpoint } from './Checkpoint'
 import { DepositTransaction } from './DepositTransaction'
 import * as contracts from './index'
@@ -12,21 +12,21 @@ import { ERC20Transaction } from './ERC20Transaction'
 import { WithdrawalTransaction } from './WithdrawalTransaction'
 
 export class AccountService {
-  accountsState:        Map<string, PlasmaState>
-  checkpoints:          Map<string, Checkpoint>
-  deposits:             Array<DepositTransaction>
-  participants:         Array<Participant>
-  txs:                  Array<ERC20Transaction>
-  txTree:               MerkleTree | undefined
-  changes:              Map<string, BigNumber>
-  changesTree:          MerkleTree | undefined
-  accounts:             Map<string, Buffer>
-  accountsTree:         MerkleTree | undefined
-  checkpointIdNext:     BigNumber
-  plasmoidContract:     contracts.Plasmoid.Contract
-  participantAddress:   string
-  slotID:               BigNumber
-  txID:                 BigNumber
+  accountsState: Map<string, PlasmaState>
+  checkpoints: Map<string, Checkpoint>
+  deposits: Array<DepositTransaction>
+  participants: Array<Participant>
+  txs: Array<ERC20Transaction>
+  txTree: MerkleTree | undefined
+  changes: Map<string, BigNumber>
+  changesTree: MerkleTree | undefined
+  accounts: Map<string, Buffer>
+  accountsTree: MerkleTree | undefined
+  checkpointIdNext: BigNumber
+  plasmoidContract: contracts.Plasmoid.Contract
+  participantAddress: string
+  slotID: BigNumber
+  txID: BigNumber
 
   constructor (plasmoidContract: contracts.Plasmoid.Contract, participantAddress: string) {
     this.accountsState = new Map()
@@ -63,16 +63,6 @@ export class AccountService {
     return participant
   }
 
-  private async addTransaction (tx: ERC20Transaction): Promise<ERC20Transaction> {
-    this.txs.push(tx)
-    await this.addChange(this.slotID, this.txID)
-    await this.addAccountChange(this.slotID, tx.lock, tx.amount)
-    this.slotID = this.slotID.plus(1)
-    this.txID = this.txID.plus(1)
-    await this.sync()
-    return tx
-  }
-
   async addDepositTransaction (owner: string, amount: BigNumber): Promise<DepositTransaction> {
     const depositTransaction = new DepositTransaction(owner, amount)
     return await this.addTransaction(depositTransaction) as DepositTransaction
@@ -81,14 +71,6 @@ export class AccountService {
   async addWithdrawalTransaction (owner: string, amount: BigNumber): Promise<WithdrawalTransaction> {
     const withdrawalTransaction = new WithdrawalTransaction(owner, amount)
     return await this.addTransaction(withdrawalTransaction) as WithdrawalTransaction
-  }
-
-  private async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
-    this.changes!.set(slotId.toString(), txId)
-  }
-
-  private async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
-    this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
   }
 
   getParticipantByAddress (address: string): Participant | undefined {
@@ -153,6 +135,24 @@ export class AccountService {
 
   accountsMerkleRoot (): string {
     return util.addHexPrefix(this.accountsTree!.root.toString('hex'))
+  }
+
+  private async addTransaction (tx: ERC20Transaction): Promise<ERC20Transaction> {
+    this.txs.push(tx)
+    await this.addChange(this.slotID, this.txID)
+    await this.addAccountChange(this.slotID, tx.lock, tx.amount)
+    this.slotID = this.slotID.plus(1)
+    this.txID = this.txID.plus(1)
+    await this.sync()
+    return tx
+  }
+
+  private async addChange (slotId: BigNumber, txId: BigNumber): Promise<void> {
+    this.changes!.set(slotId.toString(), txId)
+  }
+
+  private async addAccountChange (slotId: BigNumber, account: string, amount: BigNumber): Promise<void> {
+    this.accounts.set(slotId.toString(), Buffer.concat([solUtils.stringToBuffer(account), solUtils.bignumberToUint256(amount)]))
   }
 
   // async lastSlotID (): Promise<BigNumber> {
